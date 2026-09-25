@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f6f9;
+  --foreground: #0f172a;
+  --ink-soft: #556070;
+  --line: #d2dce6;
+  --forest: #002855; /* Mapped to primary university blue */
+  --lime: #565555;   /* Mapped to university gold/yellow */
+  --coral: #ffffff;
 }
 
 @theme inline {
@@ -12,15 +17,59 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: var(--lime);
+  color: var(--forest);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.paper-grid {
+  background-image: linear-gradient(#d2dce6 1px, transparent 1px), linear-gradient(90deg, #d2dce6 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.fade-up {
+  animation: fade-up 600ms ease-out both;
+}
+
+.label {
+  display: block;
+  margin-bottom: 0.55rem;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.field {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: #ffffff;
+  padding: 0.85rem 1rem;
+  color: var(--foreground);
+  font-size: 0.95rem;
+  outline: none;
+}
+
+.field:focus {
+  border-color: var(--forest);
+  box-shadow: 0 0 0 3px rgba(0, 40, 85, 0.15);
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
