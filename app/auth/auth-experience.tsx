@@ -302,21 +302,22 @@ export default function AuthExperience() {
   }[screen]
 
   return (
-    <div className="min-h-screen bg-[#04044a] text-white">
-      <div className="mx-auto min-h-screen max-w-[1440px] overflow-hidden bg-[#04044a]">
-        <div className="grid min-h-screen grid-rows-[auto_1fr] lg:grid-rows-1 lg:grid-cols-[1fr_1fr]">
-          <aside className="relative flex min-h-[30vh] flex-col overflow-hidden bg-[#04044a] p-5 lg:min-h-screen lg:justify-between lg:p-8 xl:p-12">
-            <Image src="/campus-community.jpg" alt="University students spending time together on campus" fill sizes="50vw" className="object-cover" />
-            <div className="absolute inset-0 bg-[#04044a]/35" aria-hidden="true" />
-            <Link href="/" className="relative z-10 flex h-[47px] w-28 items-center justify-center bg-white px-2 text-sm font-bold text-[#04044a]">Tatak.Swap</Link>
-            <div className="relative z-10 mt-auto hidden max-w-md border-l-4 border-[#f4bb2d] pl-5 text-white lg:block">
+    <div className="relative isolate h-dvh overflow-hidden text-white">
+      <div className="absolute inset-0 -z-10" aria-hidden="true">
+        <Image src="/xxtra.webp" alt="" fill sizes="100vw" className="object-cover" />
+      </div>
+      <div className="mx-auto h-full max-w-[1440px] overflow-hidden">
+        <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[1fr_1fr]">
+          <aside className="relative flex h-[18dvh] min-h-[88px] flex-col overflow-hidden p-5 lg:h-full lg:min-h-0 lg:justify-between lg:p-8 xl:p-12">
+            <Link href="/" className="relative z-10 flex h-[47px] w-28 items-center justify-center px-2 text-sm font-bold text-[#FFFFFF]">Tatak.Swap</Link>
+            <div className="relative z-10 mt-auto hidden max-w-md rounded-r-lg border-l-4 border-[#f4bb2d] bg-white/90 py-4 pr-5 pl-5 text-[#04044a] shadow-lg backdrop-blur-sm lg:block">
               <p className="text-sm font-semibold uppercase tracking-[0.2em]">USTP Community</p>
               <p className="mt-4 text-3xl font-semibold leading-tight">Useful things find a new home here.</p>
             </div>
           </aside>
 
-          <section className="relative flex min-h-[70vh] items-center overflow-hidden bg-[#04044a] px-5 py-8 text-white sm:px-8 lg:min-h-screen lg:px-12 lg:py-10">
-            <div className="relative z-10 mx-auto flex max-w-[510px] items-center justify-center min-h-full">
+          <section className="relative flex min-h-0 overflow-y-auto px-5 py-4 text-white sm:px-8 sm:py-6 lg:h-full lg:px-12 lg:py-10">
+            <div className="relative z-10 mx-auto flex max-w-[510px] items-center justify-center min-h-full lg:translate-x-0 xl:translate-x-8" style={{ zoom: 0.85 }}>
               <div className="w-full py-5 sm:py-8">
                 <div className="mb-8 flex items-center justify-between gap-3">
                   <div>

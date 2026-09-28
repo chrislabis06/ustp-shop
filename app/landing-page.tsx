@@ -34,16 +34,15 @@ export default function LandingPage() {
     <main className={`${poppins.className} bg-white text-[#101323]`}>
       <section id="home" className="relative isolate flex min-h-[720px] min-h-screen flex-col overflow-hidden bg-[#04044a] text-white">
         <Image
-          src="/campus-community.jpg"
+          src="/xtra.webp"
           alt="University students spending time together on campus"
           fill
           priority
           sizes="100vw"
           className="-z-20 object-cover"
         />
-        <div className="absolute inset-0 -z-10 bg-[#04044a]/55" aria-hidden="true" />
         <header className="mx-auto flex w-full max-w-[1368px] items-center justify-between px-5 py-5 sm:px-8">
-          <Link href="#home" aria-label="Tatak Swap home" className="flex h-[47px] w-28 items-center justify-center bg-white px-2 text-sm font-bold text-[#04044a]">
+          <Link href="#home" aria-label="Tatak Swap home" className="flex h-[47px] w-28 items-center justify-center text-sm font-bold text-[#FFFFFF]">
             Tatak.Swap
           </Link>
           <nav aria-label="Main navigation" className="hidden items-center gap-7 lg:flex">
@@ -69,14 +68,14 @@ export default function LandingPage() {
           </details>
         </header>
 
-        <div className="mx-auto flex w-full max-w-[1368px] flex-1 flex-col items-center justify-center px-5 pb-20 text-center sm:px-8">
+        <div className="mx-auto flex w-full max-w-[1368px] flex-1 flex-col items-center justify-start px-5 pt-8 pb-20 text-center sm:px-8">
           <p className="mb-5 text-sm font-medium uppercase tracking-[0.22em] text-white/85">A marketplace built for USTP</p>
           <h1 className="text-7xl font-bold leading-none sm:text-8xl xl:text-[150px]">WELCOME</h1>
-          <Link href="/marketplace" className="mt-12 rounded-full border border-white px-7 py-2.5 text-sm font-medium transition hover:bg-white hover:text-[#04044a] sm:text-lg">
+          <Link href="/marketplace" className="mt-2 rounded-full border border-white px-7 py-2.5 text-sm font-medium transition hover:bg-white hover:text-[#04044a] sm:text-lg">
             GET STARTED
           </Link>
         </div>
-        <a href="#about" className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs font-medium uppercase tracking-[0.18em] text-white/80 hover:text-white">
+        <a href="#about" className=" left-1/2 -translate-x-1/2 text-xs font-medium uppercase tracking-[0.18em] text-white/80">
           Discover Tatak.Swap
         </a>
       </section>
@@ -139,10 +138,9 @@ export default function LandingPage() {
       </section>
 
       <footer className="relative isolate overflow-hidden bg-[#04044a] text-white">
-        <Image src="/campus-community.jpg" alt="" fill sizes="100vw" className="-z-20 object-cover object-center" />
-        <div className="absolute inset-0 -z-10 bg-[#04044a]/85" aria-hidden="true" />
+        <Image src="/CONTACT.jpg" alt="" fill sizes="100vw" className="-z-20 object-cover object-center" />
         <div className="mx-auto grid max-w-[1368px] gap-10 px-5 py-12 sm:px-8 md:grid-cols-[1.1fr_0.8fr_0.8fr]">
-          <div><Link href="#home" className="inline-flex h-[47px] w-28 items-center justify-center bg-white px-2 text-sm font-bold text-[#04044a]">Tatak.Swap</Link><p className="mt-5 max-w-xs text-sm leading-6 text-white/75">An exclusive marketplace built for the USTP community, making it easier to trade useful things on campus.</p></div>
+          <div><Link href="#home" className="inline-flex h-[47px] w-28 items-center justify-center px-2 text-sm font-bold text-[#FFFFFF]">Tatak.Swap</Link><p className="mt-5 max-w-xs text-sm leading-6 text-white/75">An exclusive marketplace built for the USTP community, making it easier to trade useful things on campus.</p></div>
           <div><h2 className="font-bold">Links</h2><div className="mt-4 grid justify-start gap-3 text-sm text-white/75"><a href="#about" className="hover:text-white">About Us</a><a href="#services" className="hover:text-white">Services</a><a href="#contact" className="hover:text-white">Contact Us</a><Link href="/marketplace" className="hover:text-white">Browse items</Link></div></div>
           <div><h2 className="font-bold">Get In Touch</h2><p className="mt-4 text-sm leading-6 text-white/75">USTP, Cagayan de Oro City<br /><a href="mailto:tatak.swap@gmail.com" className="underline decoration-[#f4bb2d] underline-offset-4">tatak.swap@gmail.com</a></p></div>
         </div>
