@@ -5,10 +5,10 @@ export default function AccountPage() {
     <main className="min-h-screen bg-[#f4f6f9] px-5 py-6 sm:px-8">
       <div className="mx-auto max-w-[1100px]">
         <nav className="flex items-center justify-between">
-          <Link href="/" className="text-xl font-black tracking-[-0.06em] text-[#002855]">
+          <Link href="/marketplace" className="text-xl font-black tracking-[-0.06em] text-[#002855]">
             Tatak Swap
           </Link>
-          <Link href="/" className="text-sm font-bold text-[#556070]">
+          <Link href="/marketplace" className="text-sm font-bold text-[#556070]">
             ← Back to browse
           </Link>
         </nav>
@@ -35,12 +35,20 @@ export default function AccountPage() {
                   Your activity
                 </h2>
               </div>
-              <Link
-                href="/listings/new"
-                className="rounded-full bg-[#002855] px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[#001d3d] transition-colors"
-              >
-                New listing
-              </Link>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/marketplace"
+                  className="rounded-full border border-[#002855] px-4 py-2.5 text-sm font-bold text-[#002855] transition-colors hover:bg-[#e6edf5]"
+                >
+                  Browse marketplace
+                </Link>
+                <Link
+                  href="/listings/new"
+                  className="rounded-full bg-[#002855] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#001d3d]"
+                >
+                  New listing
+                </Link>
+              </div>
             </div>
             <div className="mt-7 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-[#d2dce6] bg-white p-6 shadow-sm">

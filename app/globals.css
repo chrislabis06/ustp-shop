@@ -71,24 +71,24 @@ textarea {
 
 .auth-field {
   width: 100%;
-  min-height: 3rem;
-  border: 1px solid #d8e0eb;
-  border-radius: 0.75rem;
-  background: #fbfcfe;
-  padding: 0.75rem 0.9rem;
-  color: #102748;
-  font-size: 0.8125rem;
+  min-height: 3.875rem;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-radius: 1.25rem;
+  background: transparent;
+  padding: 0.75rem 1rem;
+  color: #ffffff;
+  font-size: 0.9375rem;
   outline: none;
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .auth-field::placeholder {
-  color: #a0aabb;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .auth-field:focus {
-  border-color: #08234b;
-  box-shadow: 0 0 0 3px rgba(8, 35, 75, 0.1);
+  border-color: #f4bb2d;
+  box-shadow: 0 0 0 3px rgba(244, 187, 45, 0.15);
 }
 
 .auth-grid {

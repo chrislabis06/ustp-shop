@@ -25,7 +25,7 @@ export default function Marketplace() {
   return (
     <main className="min-h-screen overflow-hidden bg-[#f4f6f9]">
       <nav className="mx-auto flex max-w-[1320px] items-center justify-between px-5 py-5 sm:px-8">
-        <Link href="/" className="flex items-center gap-3 text-[#002855]">
+        <Link href="/marketplace" className="flex items-center gap-3 text-[#002855]">
           <span className="grid h-9 w-9 place-items-center rounded-full bg-[#fdb813] text-sm font-black text-[#002855]">TS</span>
           <span className="text-xl font-black tracking-[-0.06em]">Tatak<span className="text-[#fdb813]">.</span>Swap</span>
         </Link>

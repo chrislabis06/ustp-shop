@@ -8,7 +8,7 @@ const poppins = Poppins({
 
 export default function AuthPage() {
   return (
-    <main className={`${poppins.className} min-h-screen bg-[#f0f3f8] px-4 py-5 text-[#17243a] sm:px-8 sm:py-8`}>
+    <main className={`${poppins.className} min-h-screen bg-[#04044a] text-white`}>
       <AuthExperience />
     </main>
   )
