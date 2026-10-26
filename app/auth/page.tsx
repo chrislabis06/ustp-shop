@@ -6,10 +6,11 @@ const poppins = Poppins({
   weight: ['400', '500', '600', '700'],
 })
 
-export default function AuthPage() {
+export default async function AuthPage({ searchParams }: { searchParams: Promise<{ recovery?: string }> }) {
+  const { recovery } = await searchParams
   return (
     <main className={`${poppins.className} min-h-screen bg-[#04044a] text-white`}>
-      <AuthExperience />
+      <AuthExperience recovery={recovery === '1'} />
     </main>
   )
 }

@@ -122,7 +122,7 @@ export default function LandingPage() {
             <p className="mt-4 max-w-lg text-sm leading-6 text-white/80">Got questions, feedback, or need help with a listing? Reach out to our team and let’s keep the USTP community connected.</p>
             <dl className="mt-8 grid gap-5 text-sm sm:grid-cols-2">
               <div><dt className="font-semibold">Address</dt><dd className="mt-1 text-white/75">USTP, Cagayan de Oro City</dd></div>
-              <div><dt className="font-semibold">Email</dt><dd className="mt-1"><a href="mailto:tatak.swap@gmail.com" className="text-white/75 underline decoration-[#f4bb2d] underline-offset-4">tatak.swap@gmail.com</a></dd></div>
+              <div><dt className="font-semibold">Email</dt><dd className="mt-1"><a href="mailto:tatak.swap@gmail.com" className="text-white underline-offset-4">tatak.swap@gmail.com</a></dd></div>
               <div><dt className="font-semibold">Instagram</dt><dd className="mt-1 text-white/75">@Tatak.Swap</dd></div>
             </dl>
           </div>
@@ -142,7 +142,7 @@ export default function LandingPage() {
         <div className="mx-auto grid max-w-[1368px] gap-10 px-5 py-12 sm:px-8 md:grid-cols-[1.1fr_0.8fr_0.8fr]">
           <div><Link href="#home" className="inline-flex h-[47px] w-28 items-center justify-center px-2 text-sm font-bold text-[#FFFFFF]">Tatak.Swap</Link><p className="mt-5 max-w-xs text-sm leading-6 text-white/75">An exclusive marketplace built for the USTP community, making it easier to trade useful things on campus.</p></div>
           <div><h2 className="font-bold">Links</h2><div className="mt-4 grid justify-start gap-3 text-sm text-white/75"><a href="#about" className="hover:text-white">About Us</a><a href="#services" className="hover:text-white">Services</a><a href="#contact" className="hover:text-white">Contact Us</a><Link href="/marketplace" className="hover:text-white">Browse items</Link></div></div>
-          <div><h2 className="font-bold">Get In Touch</h2><p className="mt-4 text-sm leading-6 text-white/75">USTP, Cagayan de Oro City<br /><a href="mailto:tatak.swap@gmail.com" className="underline decoration-[#f4bb2d] underline-offset-4">tatak.swap@gmail.com</a></p></div>
+          <div><h2 className="font-bold">Get In Touch</h2><p className="mt-4 text-sm leading-6 text-white/75">USTP, Cagayan de Oro City<br /><a href="mailto:tatak.swap@gmail.com">tatak.swap@gmail.com</a></p></div>
         </div>
       </footer>
     </main>

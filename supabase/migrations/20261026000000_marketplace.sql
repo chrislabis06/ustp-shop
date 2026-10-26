@@ -1,0 +1,209 @@
+create table if not exists public.profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  full_name text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.listings (
+  id uuid primary key default gen_random_uuid(),
+  seller_id uuid not null references public.profiles (id) on delete cascade,
+  title text not null check (char_length(title) between 3 and 100),
+  category text not null check (category in ('Uniforms', 'PE gear', 'School supplies', 'Books')),
+  price numeric(10, 2) not null check (price >= 0),
+  condition text not null check (condition in ('Like new', 'Good', 'Fair')),
+  location text not null check (char_length(location) between 2 and 120),
+  description text not null check (char_length(description) between 10 and 2000),
+  image_path text,
+  status text not null default 'active' check (status in ('active', 'archived')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.favorites (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  listing_id uuid not null references public.listings (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, listing_id)
+);
+
+create table if not exists public.conversations (
+  id uuid primary key default gen_random_uuid(),
+  listing_id uuid not null references public.listings (id) on delete cascade,
+  buyer_id uuid not null references public.profiles (id) on delete cascade,
+  seller_id uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (listing_id, buyer_id),
+  check (buyer_id <> seller_id)
+);
+
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.conversations (id) on delete cascade,
+  sender_id uuid not null references public.profiles (id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 4000),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists listings_active_created_idx
+  on public.listings (created_at desc) where status = 'active';
+create index if not exists listings_seller_idx on public.listings (seller_id);
+create index if not exists favorites_listing_idx on public.favorites (listing_id);
+create index if not exists conversations_members_idx
+  on public.conversations (buyer_id, seller_id);
+create index if not exists messages_conversation_created_idx
+  on public.messages (conversation_id, created_at);
+
+create or replace function public.create_profile_for_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  insert into public.profiles (id, full_name)
+  values (new.id, coalesce(new.raw_user_meta_data ->> 'full_name', ''))
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created_profile on auth.users;
+create trigger on_auth_user_created_profile
+  after insert on auth.users
+  for each row execute procedure public.create_profile_for_new_user();
+
+insert into public.profiles (id, full_name)
+select id, coalesce(raw_user_meta_data ->> 'full_name', '')
+from auth.users
+on conflict (id) do nothing;
+
+alter table public.profiles enable row level security;
+alter table public.listings enable row level security;
+alter table public.favorites enable row level security;
+alter table public.conversations enable row level security;
+alter table public.messages enable row level security;
+
+drop policy if exists "Profiles are publicly readable" on public.profiles;
+create policy "Profiles are publicly readable"
+  on public.profiles for select using (true);
+drop policy if exists "Users update their own profile" on public.profiles;
+create policy "Users update their own profile"
+  on public.profiles for update to authenticated
+  using ((select auth.uid()) = id)
+  with check ((select auth.uid()) = id);
+
+drop policy if exists "Active listings are public" on public.listings;
+create policy "Active listings are public"
+  on public.listings for select
+  using (status = 'active' or (select auth.uid()) = seller_id);
+drop policy if exists "Users create their own listings" on public.listings;
+create policy "Users create their own listings"
+  on public.listings for insert to authenticated
+  with check ((select auth.uid()) = seller_id);
+drop policy if exists "Users update their own listings" on public.listings;
+create policy "Users update their own listings"
+  on public.listings for update to authenticated
+  using ((select auth.uid()) = seller_id)
+  with check ((select auth.uid()) = seller_id);
+drop policy if exists "Users delete their own listings" on public.listings;
+create policy "Users delete their own listings"
+  on public.listings for delete to authenticated
+  using ((select auth.uid()) = seller_id);
+
+drop policy if exists "Users read their own favorites" on public.favorites;
+create policy "Users read their own favorites"
+  on public.favorites for select to authenticated
+  using ((select auth.uid()) = user_id);
+drop policy if exists "Users save their own favorites" on public.favorites;
+create policy "Users save their own favorites"
+  on public.favorites for insert to authenticated
+  with check ((select auth.uid()) = user_id);
+drop policy if exists "Users remove their own favorites" on public.favorites;
+create policy "Users remove their own favorites"
+  on public.favorites for delete to authenticated
+  using ((select auth.uid()) = user_id);
+
+drop policy if exists "Conversation members can read conversations" on public.conversations;
+create policy "Conversation members can read conversations"
+  on public.conversations for select to authenticated
+  using ((select auth.uid()) in (buyer_id, seller_id));
+drop policy if exists "Buyers can start conversations with listing sellers" on public.conversations;
+create policy "Buyers can start conversations with listing sellers"
+  on public.conversations for insert to authenticated
+  with check (
+    (select auth.uid()) = buyer_id
+    and seller_id <> buyer_id
+    and exists (
+      select 1 from public.listings
+      where listings.id = conversations.listing_id
+        and listings.seller_id = conversations.seller_id
+    )
+  );
+
+drop policy if exists "Conversation members can read messages" on public.messages;
+create policy "Conversation members can read messages"
+  on public.messages for select to authenticated
+  using (
+    exists (
+      select 1 from public.conversations
+      where conversations.id = conversation_id
+        and (select auth.uid()) in (buyer_id, seller_id)
+    )
+  );
+drop policy if exists "Conversation members can send messages" on public.messages;
+create policy "Conversation members can send messages"
+  on public.messages for insert to authenticated
+  with check (
+    (select auth.uid()) = sender_id
+    and exists (
+      select 1 from public.conversations
+      where conversations.id = conversation_id
+        and (select auth.uid()) in (buyer_id, seller_id)
+    )
+  );
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('listing-images', 'listing-images', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Listing images are publicly readable" on storage.objects;
+create policy "Listing images are publicly readable"
+  on storage.objects for select
+  using (bucket_id = 'listing-images');
+drop policy if exists "Users upload their own listing images" on storage.objects;
+create policy "Users upload their own listing images"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'listing-images'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+drop policy if exists "Users update their own listing images" on storage.objects;
+create policy "Users update their own listing images"
+  on storage.objects for update to authenticated
+  using (
+    bucket_id = 'listing-images'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  )
+  with check (
+    bucket_id = 'listing-images'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+drop policy if exists "Users delete their own listing images" on storage.objects;
+create policy "Users delete their own listing images"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'listing-images'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+
+do $$
+begin
+  alter publication supabase_realtime add table public.messages;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;

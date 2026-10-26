@@ -1,25 +1,52 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { categories, formatPrice, listings } from '@/lib/mock-data'
+import { categories, formatPrice } from '@/lib/mock-data'
+import type { MarketplaceListing } from '@/lib/marketplace-data'
+import { createClient } from '@/lib/supabase/client'
 
-export default function Marketplace() {
+export default function Marketplace({ initialListings, initialSaved }: { initialListings: MarketplaceListing[]; initialSaved: string[] }) {
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All items')
-  const [saved, setSaved] = useState<string[]>([])
+  const [saved, setSaved] = useState(initialSaved)
+  const [saveError, setSaveError] = useState('')
 
   const filteredListings = useMemo(() => {
     const normalizedQuery = query.toLowerCase().trim()
-    return listings.filter((listing) => {
+    return initialListings.filter((listing) => {
       const matchesCategory = category === 'All items' || listing.category === category
       const matchesQuery = !normalizedQuery || `${listing.title} ${listing.description} ${listing.category}`.toLowerCase().includes(normalizedQuery)
       return matchesCategory && matchesQuery
     })
-  }, [category, query])
+  }, [category, initialListings, query])
 
-  function toggleSaved(id: string) {
-    setSaved((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
+  async function toggleSaved(id: string) {
+    setSaveError('')
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      setSaved((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
+      setSaveError('Preview mode: saved items are temporary until Supabase is configured.')
+      return
+    }
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/auth?next=/marketplace')
+      return
+    }
+
+    const isSaved = saved.includes(id)
+    const result = isSaved
+      ? await supabase.from('favorites').delete().eq('user_id', user.id).eq('listing_id', id)
+      : await supabase.from('favorites').insert({ user_id: user.id, listing_id: id })
+
+    if (result.error) {
+      setSaveError('Could not update your saved items. Please try again.')
+      return
+    }
+    setSaved((current) => isSaved ? current.filter((item) => item !== id) : [...current, id])
   }
 
   return (
@@ -76,9 +103,9 @@ export default function Marketplace() {
           <span className="text-sm text-[#556070]">{filteredListings.length} items</span>
         </div>
         {filteredListings.length ? <div className="grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredListings.map((listing, index) => <article key={listing.id} className="fade-up group" style={{ animationDelay: `${index * 70}ms` }}>
-            <div className="relative aspect-[1.12] overflow-hidden rounded-[20px] shadow-sm" style={{ backgroundColor: listing.accent }}>
-              <button aria-label={saved.includes(listing.id) ? 'Remove from saved items' : 'Save item'} onClick={() => toggleSaved(listing.id)} className={`absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full text-lg shadow-sm transition ${saved.includes(listing.id) ? 'bg-[#fdb813] text-[#002855]' : 'bg-white/90 text-[#002855] hover:bg-[#fdb813]'}`}>{saved.includes(listing.id) ? '♥' : '♡'}</button>
+              {filteredListings.map((listing, index) => <article key={listing.id} className="fade-up group" style={{ animationDelay: `${index * 70}ms` }}>
+            <div className="relative aspect-[1.12] overflow-hidden rounded-[20px] shadow-sm" style={listing.imageUrl ? { backgroundImage: `url("${listing.imageUrl}")`, backgroundPosition: 'center', backgroundSize: 'cover' } : { backgroundColor: listing.accent }}>
+              <button aria-label={saved.includes(listing.id) ? 'Remove from saved items' : 'Save item'} onClick={() => void toggleSaved(listing.id)} className={`absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full text-lg shadow-sm transition ${saved.includes(listing.id) ? 'bg-[#fdb813] text-[#002855]' : 'bg-white/90 text-[#002855] hover:bg-[#fdb813]'}`}>{saved.includes(listing.id) ? '♥' : '♡'}</button>
               <span className="absolute bottom-4 left-4 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-[#002855] shadow-sm">{listing.category}</span>
             </div>
             <Link href={`/listings/${listing.id}`} className="mt-4 block">
@@ -87,6 +114,7 @@ export default function Marketplace() {
             </Link>
           </article>)}
         </div> : <div className="rounded-3xl border border-dashed border-[#d2dce6] py-20 text-center"><p className="font-black text-[#002855]">No listings match that search.</p><button onClick={() => { setQuery(''); setCategory('All items') }} className="mt-3 text-sm font-bold text-[#fdb813]">Clear filters</button></div>}
+        {saveError && <p role="status" className="mt-5 text-sm text-red-700">{saveError}</p>}
       </section>
 
       <section id="how-it-works" className="bg-[#f4f6f9] px-5 py-16 sm:px-8 shadow-inner"><div className="mx-auto max-w-[1320px]"><p className="text-xs font-black uppercase tracking-[0.22em] text-[#002855]">Simple by design</p><div className="mt-8 grid gap-8 md:grid-cols-3"><div><span className="text-5xl font-black text-[#002855]/25">01</span><h3 className="mt-4 text-xl font-black text-[#002855]">Find your thing</h3><p className="mt-2 max-w-xs text-sm leading-6 text-[#1a385c]">Search through useful finds from people around campus.</p></div><div><span className="text-5xl font-black text-[#002855]/25">02</span><h3 className="mt-4 text-xl font-black text-[#002855]">Meet locally</h3><p className="mt-2 max-w-xs text-sm leading-6 text-[#1a385c]">Message the seller and arrange a convenient campus pickup.</p></div><div><span className="text-5xl font-black text-[#002855]/25">03</span><h3 className="mt-4 text-xl font-black text-[#002855]">Pass it on</h3><p className="mt-2 max-w-xs text-sm leading-6 text-[#1a385c]">Have something useful? List it in less than a minute.</p></div></div></div></section>

@@ -18,9 +18,9 @@ const passwordRules = [
 
 const demoAuthActive = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-export default function AuthExperience() {
+export default function AuthExperience({ recovery = false }: { recovery?: boolean }) {
   const router = useRouter()
-  const [screen, setScreen] = useState<Screen>('login')
+  const [screen, setScreen] = useState<Screen>(recovery ? 'password' : 'login')
   const [identifier, setIdentifier] = useState('')
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
@@ -28,9 +28,9 @@ export default function AuthExperience() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
-  const [code, setCode] = useState(['', '', '', '', ''])
+  const [code, setCode] = useState(['', '', '', '', '', ''])
   const [secondsLeft, setSecondsLeft] = useState(40)
-  const [purpose, setPurpose] = useState<VerifyPurpose>('signup')
+  const [purpose, setPurpose] = useState<VerifyPurpose>(recovery ? 'recovery' : 'signup')
   const [channel, setChannel] = useState<VerifyChannel>('email')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -42,6 +42,11 @@ export default function AuthExperience() {
     const timer = window.setTimeout(() => setSecondsLeft((remaining) => remaining - 1), 1000)
     return () => window.clearTimeout(timer)
   }, [screen, secondsLeft])
+
+  function postAuthPath() {
+    const next = new URLSearchParams(window.location.search).get('next')
+    return next?.startsWith('/') && !next.startsWith('//') ? next : '/marketplace'
+  }
 
   function announce(nextMessage: string, error = false) {
     setMessage(nextMessage)
@@ -60,8 +65,7 @@ export default function AuthExperience() {
     announce('')
     try {
       if (demoAuthActive) {
-        router.replace('/marketplace')
-        announce('Demo mode is active. You can continue without Supabase configured.')
+        announce('Sign-in is unavailable until Supabase is configured.', true)
         return
       }
 
@@ -71,7 +75,7 @@ export default function AuthExperience() {
         ? await supabase.auth.signInWithPassword({ ...credentials, email: identifier.trim() })
         : await supabase.auth.signInWithPassword({ ...credentials, phone: identifier.trim() })
       if (result.error) throw result.error
-      router.replace('/marketplace')
+      router.replace(postAuthPath())
     } catch (error) {
       announce(error instanceof Error ? error.message : 'We could not sign you in. Please try again.', true)
     } finally {
@@ -93,12 +97,7 @@ export default function AuthExperience() {
     announce('')
     try {
       if (demoAuthActive) {
-        setPurpose('signup')
-        setChannel('email')
-        setCode(['', '', '', '', ''])
-        setSecondsLeft(40)
-        announce('Demo mode is active. Use the verification screen to continue.')
-        setScreen('verify')
+        announce('Account creation is unavailable until Supabase is configured.', true)
         return
       }
 
@@ -106,19 +105,17 @@ export default function AuthExperience() {
       const { data, error } = await supabase.auth.signUp({
         email: identifier.trim(),
         password,
-        options: { data: { full_name: fullName.trim() } },
+        options: {
+          data: { full_name: fullName.trim() },
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/marketplace`,
+        },
       })
       if (error) throw error
       if (data.session) {
-        router.replace('/marketplace')
+        router.replace(postAuthPath())
         return
       }
-      setPurpose('signup')
-      setChannel('email')
-      setCode(['', '', '', '', ''])
-      setSecondsLeft(40)
-      announce('We sent a verification code to your email.')
-      setScreen('verify')
+      announce('Check your email for a confirmation link to finish creating your account.')
     } catch (error) {
       announce(error instanceof Error ? error.message : 'We could not create your account. Please try again.', true)
     } finally {
@@ -135,7 +132,7 @@ export default function AuthExperience() {
       if (demoAuthActive) {
         setPurpose('recovery')
         setChannel(nextChannel)
-        setCode(['', '', '', '', ''])
+        setCode(['', '', '', '', '', ''])
         setSecondsLeft(40)
         announce(`Demo mode is active. A verification code is ready for your ${nextChannel === 'email' ? 'email' : 'phone'}.`)
         setScreen('verify')
@@ -144,14 +141,18 @@ export default function AuthExperience() {
 
       const supabase = createClient()
       const result = nextChannel === 'email'
-        ? await supabase.auth.resetPasswordForEmail(identifier.trim())
+        ? await supabase.auth.resetPasswordForEmail(identifier.trim(), { redirectTo: `${window.location.origin}/auth/callback?next=/auth?recovery=1` })
         : await supabase.auth.signInWithOtp({ phone: identifier.trim(), options: { shouldCreateUser: false } })
       if (result.error) throw result.error
+      if (nextChannel === 'email') {
+        announce('We sent a password reset link to your email.')
+        return
+      }
       setPurpose('recovery')
       setChannel(nextChannel)
-      setCode(['', '', '', '', ''])
+      setCode(['', '', '', '', '', ''])
       setSecondsLeft(40)
-      announce(`We sent a verification code to your ${nextChannel === 'email' ? 'email' : 'phone'}.`)
+      announce('We sent a verification code to your phone.')
       setScreen('verify')
     } catch (error) {
       announce(error instanceof Error ? error.message : 'We could not send a code. Check your details and try again.', true)
@@ -163,8 +164,8 @@ export default function AuthExperience() {
   async function handleVerify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const token = code.join('')
-    if (token.length !== 5) {
-      announce('Enter all 5 digits from your message.', true)
+    if (token.length !== 6) {
+      announce('Enter all 6 digits from your message.', true)
       return
     }
     setBusy(true)
@@ -172,7 +173,7 @@ export default function AuthExperience() {
     try {
       if (demoAuthActive) {
         if (purpose === 'signup') {
-          router.replace('/marketplace')
+          router.replace(postAuthPath())
           return
         }
         openScreen('password')
@@ -189,7 +190,7 @@ export default function AuthExperience() {
         : await supabase.auth.verifyOtp({ phone: identifier.trim(), token, type: 'sms' })
       if (result.error) throw result.error
       if (purpose === 'signup') {
-        router.replace('/marketplace')
+        router.replace(postAuthPath())
         return
       }
       openScreen('password')
@@ -206,7 +207,7 @@ export default function AuthExperience() {
     announce('')
     try {
       if (demoAuthActive) {
-        setCode(['', '', '', '', ''])
+        setCode(['', '', '', '', '', ''])
         setSecondsLeft(40)
         announce('Demo mode is active. A new verification code is ready.')
         codeInputs.current[0]?.focus()
@@ -217,10 +218,10 @@ export default function AuthExperience() {
       const result = channel === 'email'
         ? purpose === 'signup'
           ? await supabase.auth.resend({ type: 'signup', email: identifier.trim() })
-          : await supabase.auth.resetPasswordForEmail(identifier.trim())
+          : await supabase.auth.signInWithOtp({ email: identifier.trim(), options: { shouldCreateUser: false } })
         : await supabase.auth.signInWithOtp({ phone: identifier.trim(), options: { shouldCreateUser: false } })
       if (result.error) throw result.error
-      setCode(['', '', '', '', ''])
+      setCode(['', '', '', '', '', ''])
       setSecondsLeft(40)
       announce('A new verification code is on its way.')
       codeInputs.current[0]?.focus()
@@ -245,14 +246,14 @@ export default function AuthExperience() {
     announce('')
     try {
       if (demoAuthActive) {
-        router.replace('/marketplace')
+        router.replace(postAuthPath())
         announce('Demo mode is active. Your password has been updated locally.')
         return
       }
 
       const { error } = await createClient().auth.updateUser({ password })
       if (error) throw error
-      router.replace('/marketplace')
+      router.replace(postAuthPath())
     } catch (error) {
       announce(error instanceof Error ? error.message : 'We could not update your password. Please try again.', true)
     } finally {
@@ -267,15 +268,15 @@ export default function AuthExperience() {
       return
     }
     const nextCode = [...code]
-    digits.slice(0, 5 - index).split('').forEach((digit, offset) => { nextCode[index + offset] = digit })
+    digits.slice(0, 6 - index).split('').forEach((digit, offset) => { nextCode[index + offset] = digit })
     setCode(nextCode)
-    codeInputs.current[Math.min(index + digits.length, 4)]?.focus()
+    codeInputs.current[Math.min(index + digits.length, 5)]?.focus()
   }
 
   function handleCodeKeyDown(event: KeyboardEvent<HTMLInputElement>, index: number) {
     if (event.key === 'Backspace' && !code[index] && index > 0) codeInputs.current[index - 1]?.focus()
     if (event.key === 'ArrowLeft' && index > 0) codeInputs.current[index - 1]?.focus()
-    if (event.key === 'ArrowRight' && index < 4) codeInputs.current[index + 1]?.focus()
+    if (event.key === 'ArrowRight' && index < 5) codeInputs.current[index + 1]?.focus()
   }
 
   function handleCodePaste(event: ClipboardEvent<HTMLInputElement>, index: number) {
@@ -287,7 +288,7 @@ export default function AuthExperience() {
 
   const isLoginOrSignup = screen === 'login' || screen === 'signup'
   const heading = {
-    login: 'Welcome back',
+    login: 'Sign in',
     signup: 'Create your account',
     forgot: 'Reset your password',
     verify: purpose === 'signup' ? 'Verify your email' : 'Check your inbox',
@@ -297,13 +298,13 @@ export default function AuthExperience() {
     login: 'Sign in to pick up where campus life left off.',
     signup: 'Join the USTP community and make room for good finds.',
     forgot: 'Enter the email or phone linked to your account.',
-    verify: `Enter the 5-digit code sent to ${identifier}.`,
+    verify: `Enter the 6-digit code sent to ${identifier}.`,
     password: 'Choose a strong password you have not used before.',
   }[screen]
 
   return (
     <div className="relative isolate h-dvh overflow-hidden text-white">
-      <div className="absolute inset-0 -z-10" aria-hidden="true">
+      <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
         <Image src="/xxtra.webp" alt="" fill sizes="100vw" className="object-cover" />
       </div>
       <div className="mx-auto h-full max-w-[1440px] overflow-hidden">
@@ -316,8 +317,8 @@ export default function AuthExperience() {
             </div>
           </aside>
 
-          <section className="relative flex min-h-0 overflow-y-auto px-5 py-4 text-white sm:px-8 sm:py-6 lg:h-full lg:px-12 lg:py-10">
-            <div className="relative z-10 mx-auto flex max-w-[510px] items-center justify-center min-h-full lg:translate-x-0 xl:translate-x-8" style={{ zoom: 0.85 }}>
+          <section className="relative z-20 flex min-h-0 overflow-y-auto px-5 py-4 text-white pointer-events-auto sm:px-8 sm:py-6 lg:h-full lg:px-12 lg:py-10">
+            <div className="relative z-20 mx-auto flex max-w-[510px] items-center justify-center min-h-full pointer-events-auto lg:translate-x-0 xl:translate-x-8" style={{ zoom: 0.85 }}>
               <div className="w-full py-5 sm:py-8">
                 <div className="mb-8 flex items-center justify-between gap-3">
                   <div>
@@ -328,9 +329,9 @@ export default function AuthExperience() {
                 </div>
 
                 {isLoginOrSignup && (
-                  <div className="mb-8 grid grid-cols-2 border-b border-white/25" role="tablist" aria-label="Account access">
-                    <button type="button" role="tab" aria-selected={screen === 'login'} onClick={() => openScreen('login')} className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${screen === 'login' ? 'border-[#f4bb2d] text-white' : 'border-transparent text-white/60 hover:text-white'}`}>Sign in</button>
-                    <button type="button" role="tab" aria-selected={screen === 'signup'} onClick={() => openScreen('signup')} className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${screen === 'signup' ? 'border-[#f4bb2d] text-white' : 'border-transparent text-white/60 hover:text-white'}`}>Create account</button>
+                  <div className="relative z-20 mb-8 grid grid-cols-2 border-b border-white/25 pointer-events-auto" role="tablist" aria-label="Account access">
+                    <button type="button" role="tab" aria-selected={screen === 'login'} onClick={() => openScreen('login')} className={`relative z-20 pointer-events-auto border-b-2 px-4 py-3 text-sm font-semibold transition ${screen === 'login' ? 'border-[#f4bb2d] text-white' : 'border-transparent text-white/60 hover:text-white'}`}>Sign in</button>
+                    <button type="button" role="tab" aria-selected={screen === 'signup'} onClick={() => openScreen('signup')} className={`relative z-20 pointer-events-auto border-b-2 px-4 py-3 text-sm font-semibold transition ${screen === 'signup' ? 'border-[#f4bb2d] text-white' : 'border-transparent text-white/60 hover:text-white'}`}>Create account</button>
                   </div>
                 )}
 
@@ -357,7 +358,7 @@ export default function AuthExperience() {
                 )}
 
                 {screen === 'signup' && (
-                  <form onSubmit={handleSignup} className="space-y-4">
+                  <form onSubmit={handleSignup} className="relative z-20 space-y-4 pointer-events-auto">
                     <div>
                       <label htmlFor="signup-name" className="mb-2 block text-sm font-semibold text-white">Full name</label>
                       <input id="signup-name" type="text" autoComplete="name" required minLength={2} value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your name" className="auth-field" />
@@ -398,7 +399,7 @@ export default function AuthExperience() {
                   <form onSubmit={handleVerify} className="space-y-6">
                     <div>
                       <label className="mb-3 block text-sm font-semibold text-white" htmlFor="verification-code-0">Verification code</label>
-                      <div className="flex justify-between gap-2 sm:gap-3" aria-label="5-digit verification code">
+                      <div className="flex justify-between gap-2 sm:gap-3" aria-label="6-digit verification code">
                         {code.map((digit, index) => (
                           <input
                             key={index}
@@ -408,7 +409,7 @@ export default function AuthExperience() {
                             inputMode="numeric"
                             autoComplete={index === 0 ? 'one-time-code' : 'off'}
                             aria-label={`Verification code digit ${index + 1}`}
-                            maxLength={index === 0 ? 5 : 1}
+                            maxLength={index === 0 ? 6 : 1}
                             required
                             value={digit}
                             onChange={(event) => updateCode(index, event.target.value)}
@@ -474,5 +475,5 @@ export default function AuthExperience() {
 }
 
 function SubmitButton({ children, busy }: { children: React.ReactNode; busy: boolean }) {
-  return <button type="submit" disabled={busy} className="flex min-h-12 w-full items-center justify-center rounded-[20px] bg-white px-5 py-3 text-sm font-semibold text-[#04044a] transition hover:bg-[#f4bb2d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f4bb2d] disabled:cursor-wait disabled:opacity-70">{children}</button>
+  return <button type="submit" disabled={busy} className="relative z-20 flex min-h-12 w-full items-center justify-center rounded-[20px] bg-white px-5 py-3 text-sm font-semibold text-[#04044a] pointer-events-auto transition hover:bg-[#f4bb2d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f4bb2d] disabled:cursor-wait disabled:opacity-70">{children}</button>
 }
