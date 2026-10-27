@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
 import { categories } from '@/lib/mock-data'
 import { createClient } from '@/lib/supabase/client'
+import { getSupabaseConfig } from '@/lib/supabase/config'
 
 const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
 const maxImageSize = 5 * 1024 * 1024
@@ -31,7 +32,7 @@ export default function NewListingPage() {
       setError('Use a JPG, PNG, or WebP image up to 5 MB.')
       return
     }
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (!getSupabaseConfig()) {
       setBusy(false)
       setError('Listing creation requires Supabase to be configured.')
       return
@@ -58,7 +59,7 @@ export default function NewListingPage() {
     }
 
     const { data: listing, error: insertError } = await supabase.from('listings').insert({
-      seller_id: user.id,
+      owner_id: user.id,
       title: String(formData.get('title') || '').trim(),
       category: String(formData.get('category') || ''),
       price: Number(formData.get('price')),

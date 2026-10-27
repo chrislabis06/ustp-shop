@@ -7,8 +7,9 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function startConversation(formData: FormData) {
   const listingId = formData.get('listingId')
-  if (typeof listingId !== 'string' || !listingId) throw new Error('A listing is required.')
   if (!hasSupabaseConfiguration()) redirect('/auth')
+  const parsedListingId = typeof listingId === 'string' ? Number(listingId) : NaN
+  if (!Number.isSafeInteger(parsedListingId) || parsedListingId < 1) throw new Error('A valid listing is required.')
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -16,13 +17,14 @@ export async function startConversation(formData: FormData) {
 
   const { data: listing, error: listingError } = await supabase
     .from('listings')
-    .select('id,seller_id')
-    .eq('id', listingId)
+    .select('id,owner_id')
+    .eq('id', parsedListingId)
     .eq('status', 'active')
     .single()
 
   if (listingError || !listing) throw new Error('This listing is no longer available.')
-  if (listing.seller_id === user.id) throw new Error('You cannot message yourself about your own listing.')
+  if (listing.owner_id === user.id) throw new Error('You cannot message yourself about your own listing.')
+  if (!listing.owner_id) throw new Error('Messaging is unavailable for this legacy listing until it has an assigned owner.')
 
   const { data: existing } = await supabase
     .from('conversations')
@@ -35,7 +37,7 @@ export async function startConversation(formData: FormData) {
   if (!conversationId) {
     const { data: conversation, error } = await supabase
       .from('conversations')
-      .insert({ listing_id: listingId, buyer_id: user.id, seller_id: listing.seller_id })
+      .insert({ listing_id: parsedListingId, buyer_id: user.id, seller_id: listing.owner_id })
       .select('id')
       .single()
     if (error) throw new Error(`Could not start conversation: ${error.message}`)
@@ -64,7 +66,7 @@ export async function archiveListing(formData: FormData) {
     .from('listings')
     .update({ status: 'archived' })
     .eq('id', listingId)
-    .eq('seller_id', user.id)
+    .eq('owner_id', user.id)
     .eq('status', 'active')
     .select('id')
     .maybeSingle()

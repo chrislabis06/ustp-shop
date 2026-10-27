@@ -1,12 +1,9 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { getSupabaseConfig } from '@/lib/supabase/config'
 
 export function createClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const config = getSupabaseConfig()
+  if (!config) throw new Error('Authentication is not configured. Set the Supabase URL and publishable key.')
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Authentication is not configured. Add the public Supabase URL and anon key to the environment.')
-  }
-
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  return createBrowserClient(config.supabaseUrl, config.supabaseKey)
 }

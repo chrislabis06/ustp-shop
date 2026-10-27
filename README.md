@@ -9,7 +9,7 @@ A student marketplace for USTP built with Next.js, Supabase Auth, PostgreSQL, St
 
    ```dotenv
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-or-publishable-key
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
    ```
 
 3. Apply [`supabase/migrations/20261026000000_marketplace.sql`](supabase/migrations/20261026000000_marketplace.sql) in the Supabase SQL Editor. It creates the profile, listing, favorite, conversation, and message tables; row-level security policies; the `listing-images` bucket; and the message Realtime publication.
@@ -21,7 +21,7 @@ When Supabase is not configured, the public marketplace uses sample listings. Au
 
 ## Production deployment
 
-Deploy the repository to a Node.js-compatible platform such as Vercel. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to the production environment, deploy, then add the production site URL and `/auth/callback` URL to Supabase Auth's allowlist. Use the hosting platform's managed HTTPS certificate; do not place a Supabase service-role key in this app.
+Deploy the repository to a Node.js-compatible platform such as Vercel. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the production environment, deploy, then add the production site URL and `/auth/callback` URL to Supabase Auth's allowlist. Use the hosting platform's managed HTTPS certificate; do not place a Supabase service-role key in this app.
 
 Before launch, verify the database migration is applied, Supabase email delivery is configured, the listing-images bucket and policies exist, and signup, password recovery, listing photo uploads, favorites, and realtime messaging work with separate student accounts.
 

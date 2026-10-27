@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import { categories, formatPrice } from '@/lib/mock-data'
 import type { MarketplaceListing } from '@/lib/marketplace-data'
 import { createClient } from '@/lib/supabase/client'
+import { getSupabaseConfig } from '@/lib/supabase/config'
 
 export default function Marketplace({ initialListings, initialSaved }: { initialListings: MarketplaceListing[]; initialSaved: string[] }) {
   const router = useRouter()
@@ -25,7 +26,7 @@ export default function Marketplace({ initialListings, initialSaved }: { initial
 
   async function toggleSaved(id: string) {
     setSaveError('')
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (!getSupabaseConfig()) {
       setSaved((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
       setSaveError('Preview mode: saved items are temporary until Supabase is configured.')
       return

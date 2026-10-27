@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ClipboardEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getSupabaseConfig } from '@/lib/supabase/config'
 
 type Screen = 'login' | 'signup' | 'forgot' | 'verify' | 'password'
 type VerifyPurpose = 'signup' | 'recovery'
@@ -16,7 +17,7 @@ const passwordRules = [
   { label: 'At least one number', test: (value: string) => /\d/.test(value) },
 ]
 
-const demoAuthActive = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const demoAuthActive = !getSupabaseConfig()
 
 export default function AuthExperience({ recovery = false }: { recovery?: boolean }) {
   const router = useRouter()

@@ -13,7 +13,7 @@ export default async function AccountPage() {
 
   const [{ data: profile }, { data: listings, error: listingsError }, { count: savedCount, error: favoritesError }] = await Promise.all([
     supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
-    supabase.from('listings').select('id,title,price,status,created_at').eq('seller_id', user.id).order('created_at', { ascending: false }),
+    supabase.from('listings').select('id,title,price,status,created_at').eq('owner_id', user.id).order('created_at', { ascending: false }),
     supabase.from('favorites').select('listing_id', { count: 'exact', head: true }).eq('user_id', user.id),
   ])
   if (listingsError) throw new Error(`Could not load your listings: ${listingsError.message}`)
