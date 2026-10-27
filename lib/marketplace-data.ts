@@ -12,6 +12,7 @@ type ListingRow = {
   id: number | string
   title: string
   category: string
+  size: string | null
   price: number | string
   condition: string
   location: string | null
@@ -30,6 +31,7 @@ function toMarketplaceListing(row: ListingRow, imageUrl: string | null, sellerNa
     id: String(row.id),
     title: row.title,
     category: row.category,
+    size: row.size,
     price: Number(row.price),
     condition: row.condition,
     seller: sellerName || 'USTP student',
@@ -52,7 +54,7 @@ export async function getMarketplaceListings(): Promise<MarketplaceListing[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('listings')
-    .select('id,title,category,price,condition,location,description,image_path,created_at,owner_id')
+    .select('id,title,category,size,price,condition,location,description,image_path,created_at,owner_id')
     .eq('status', 'active')
     .order('created_at', { ascending: false })
 
@@ -83,7 +85,7 @@ export async function getMarketplaceListing(id: string): Promise<MarketplaceList
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('listings')
-    .select('id,title,category,price,condition,location,description,image_path,created_at,owner_id')
+    .select('id,title,category,size,price,condition,location,description,image_path,created_at,owner_id')
     .eq('id', id)
     .maybeSingle()
 

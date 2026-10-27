@@ -62,6 +62,7 @@ export default function NewListingPage() {
       owner_id: user.id,
       title: String(formData.get('title') || '').trim(),
       category: String(formData.get('category') || ''),
+      size: String(formData.get('size') || '').trim() || null,
       price: Number(formData.get('price')),
       condition: String(formData.get('condition') || ''),
       location: String(formData.get('location') || '').trim(),
@@ -96,6 +97,7 @@ export default function NewListingPage() {
           <div className="grid gap-7 sm:grid-cols-2">
             <label className="sm:col-span-2"><span className="label">Item title</span><input name="title" required minLength={3} maxLength={100} placeholder="e.g. USTP college uniform" className="field" /></label>
             <label><span className="label">Category</span><select name="category" className="field" defaultValue="Uniforms">{categories.slice(1).map((category) => <option key={category}>{category}</option>)}</select></label>
+            <label><span className="label">Size <span className="font-normal text-[#8896a6]">(optional)</span></span><input name="size" maxLength={40} placeholder="e.g. Medium, US 9, A4" className="field" /></label>
             <label><span className="label">Price</span><input name="price" required type="number" min="0" step="0.01" placeholder="₱ 0" className="field" /></label>
             <label><span className="label">Condition</span><select name="condition" className="field"><option>Like new</option><option>Good</option><option>Fair</option></select></label>
             <label><span className="label">Meetup location</span><input name="location" required minLength={2} maxLength={120} placeholder="e.g. Main Campus" className="field" /></label>

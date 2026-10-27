@@ -2,6 +2,7 @@ export type Listing = {
   id: string
   title: string
   category: string
+  size?: string | null
   price: number
   condition: string
   seller: string

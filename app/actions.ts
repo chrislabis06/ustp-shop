@@ -47,12 +47,6 @@ export async function startConversation(formData: FormData) {
   redirect(`/messages/${conversationId}`)
 }
 
-export async function signOut() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
-  redirect('/')
-}
-
 export async function archiveListing(formData: FormData) {
   const listingId = formData.get('listingId')
   const parsedListingId = typeof listingId === 'string' ? Number(listingId) : NaN
