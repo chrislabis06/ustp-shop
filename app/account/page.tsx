@@ -10,6 +10,7 @@ export default async function AccountPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth?next=/account')
+  const { data: isAdmin } = await supabase.rpc('is_admin')
 
   const [{ data: profile }, { data: listings, error: listingsError }, { count: savedCount, error: favoritesError }] = await Promise.all([
     supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
@@ -26,7 +27,7 @@ export default async function AccountPage() {
       <div className="mx-auto max-w-[1100px]">
         <nav className="flex items-center justify-between">
           <Link href="/marketplace" className="text-xl font-black tracking-[-0.06em] text-[#002855]">Tatak Swap</Link>
-          <div className="flex items-center gap-4"><Link href="/messages" className="text-sm font-bold text-[#556070]">Messages</Link><Link href="/marketplace" className="text-sm font-bold text-[#556070]">Browse</Link><form action={signOut}><button className="text-sm font-bold text-[#556070]">Sign out</button></form></div>
+          <div className="flex items-center gap-4">{isAdmin && <Link href="/admin" className="text-sm font-bold text-[#556070]">Admin</Link>}<Link href="/messages" className="text-sm font-bold text-[#556070]">Messages</Link><Link href="/marketplace" className="text-sm font-bold text-[#556070]">Browse</Link><form action={signOut}><button className="text-sm font-bold text-[#556070]">Sign out</button></form></div>
         </nav>
         <div className="mt-14 grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
           <section className="h-fit rounded-[24px] bg-[#002855] p-8 text-white sm:p-10">

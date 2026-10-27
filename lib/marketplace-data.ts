@@ -14,7 +14,7 @@ type ListingRow = {
   category: string
   price: number | string
   condition: string
-  location: string
+  location: string | null
   description: string
   image_path: string | null
   created_at: string
@@ -34,7 +34,7 @@ function toMarketplaceListing(row: ListingRow, imageUrl: string | null, sellerNa
     condition: row.condition,
     seller: sellerName || 'USTP student',
     sellerId: row.owner_id,
-    location: row.location,
+    location: row.location || 'USTP campus',
     posted: new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(row.created_at)),
     description: row.description,
     accent: '#e6edf5',

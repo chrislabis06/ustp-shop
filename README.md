@@ -12,10 +12,11 @@ A student marketplace for USTP built with Next.js, Supabase Auth, PostgreSQL, St
    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
    ```
 
-3. Apply [`supabase/migrations/20261026000000_marketplace.sql`](supabase/migrations/20261026000000_marketplace.sql) in the Supabase SQL Editor. It creates the profile, listing, favorite, conversation, and message tables; row-level security policies; the `listing-images` bucket; and the message Realtime publication.
-4. In Supabase Auth URL Configuration, set the local Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to the redirect URL allowlist. Add the production equivalents after deployment.
-5. Configure an email provider in Supabase Auth before inviting real users. For production, configure SMTP and verify the sender domain; the signup and recovery flows use confirmation links handled by `/auth/callback`.
-6. Start the app with `npm run dev` and open `http://localhost:3000`.
+3. Back up the legacy tables, then apply [`supabase/migrations/20261027000000_upgrade_legacy_schema.sql`](supabase/migrations/20261027000000_upgrade_legacy_schema.sql) in the Supabase SQL Editor. It maps legacy integer users to Auth UUIDs by email and aborts if mappings are incomplete; review its preflight errors before retrying. It preserves integer listing/conversation IDs, creates profiles/favorites, migrates participant IDs and `message_text` to the current schema, and sets row-level security, storage, and Realtime policies.
+4. Sign up and confirm `chrislabis06@gmail.com` through the normal app flow. The migration allowlists this address; after applying it, sign in with that account and open `/admin`. The dashboard is read-only and links to the normal student storefront for user-side preview; it does not impersonate users.
+5. In Supabase Auth URL Configuration, set the local Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to the redirect URL allowlist. Add the production equivalents after deployment.
+6. Configure an email provider in Supabase Auth before inviting real users. For production, configure SMTP and verify the sender domain; the signup and recovery flows use confirmation links handled by `/auth/callback`.
+7. Start the app with `npm run dev` and open `http://localhost:3000`.
 
 When Supabase is not configured, the public marketplace uses sample listings. Authentication, account features, uploads, and messaging require a configured Supabase project and the migration above.
 

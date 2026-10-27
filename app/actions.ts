@@ -29,7 +29,7 @@ export async function startConversation(formData: FormData) {
   const { data: existing } = await supabase
     .from('conversations')
     .select('id')
-    .eq('listing_id', listingId)
+    .eq('listing_id', parsedListingId)
     .eq('buyer_id', user.id)
     .maybeSingle()
 
@@ -55,7 +55,8 @@ export async function signOut() {
 
 export async function archiveListing(formData: FormData) {
   const listingId = formData.get('listingId')
-  if (typeof listingId !== 'string' || !listingId) throw new Error('A listing is required.')
+  const parsedListingId = typeof listingId === 'string' ? Number(listingId) : NaN
+  if (!Number.isSafeInteger(parsedListingId) || parsedListingId < 1) throw new Error('A valid listing is required.')
   if (!hasSupabaseConfiguration()) redirect('/auth')
 
   const supabase = await createClient()
@@ -65,7 +66,7 @@ export async function archiveListing(formData: FormData) {
   const { data, error } = await supabase
     .from('listings')
     .update({ status: 'archived' })
-    .eq('id', listingId)
+    .eq('id', parsedListingId)
     .eq('owner_id', user.id)
     .eq('status', 'active')
     .select('id')
@@ -76,5 +77,5 @@ export async function archiveListing(formData: FormData) {
 
   revalidatePath('/account')
   revalidatePath('/marketplace')
-  revalidatePath(`/listings/${listingId}`)
+  revalidatePath(`/listings/${parsedListingId}`)
 }
