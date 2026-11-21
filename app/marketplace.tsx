@@ -8,10 +8,18 @@ import type { MarketplaceListing } from '@/lib/marketplace-data'
 import { createClient } from '@/lib/supabase/client'
 import { getSupabaseConfig } from '@/lib/supabase/config'
 
-export default function Marketplace({ initialListings, initialSaved }: { initialListings: MarketplaceListing[]; initialSaved: string[] }) {
+export default function Marketplace({
+  initialListings,
+  initialSaved,
+  initialCategory = 'All items',
+}: {
+  initialListings: MarketplaceListing[]
+  initialSaved: string[]
+  initialCategory?: string
+}) {
   const router = useRouter()
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('All items')
+  const [category, setCategory] = useState(initialCategory)
   const [saved, setSaved] = useState(initialSaved)
   const [saveError, setSaveError] = useState('')
 

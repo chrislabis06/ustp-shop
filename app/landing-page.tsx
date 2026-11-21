@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { Poppins } from 'next/font/google'
+import HeroClouds3D from './hero-clouds-3d'
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -32,31 +33,44 @@ const siteLinks = [
 export default function LandingPage() {
   return (
     <main className={`${poppins.className} bg-white text-[#101323]`}>
-      <section id="home" className="relative isolate flex min-h-[720px] min-h-screen flex-col overflow-hidden bg-[#04044a] text-white">
-        <Image
-          src="/xtra.webp"
-          alt="University students spending time together on campus"
-          fill
-          priority
-          sizes="100vw"
-          className="-z-20 object-cover"
-        />
+      <section id="home" className="relative isolate flex min-h-[720px] min-h-screen flex-col overflow-hidden bg-[#1e3a6e] text-white">
+        {/* Layer 1: Original full-bleed /xtra.webp USTP building photo (crisp, zero cutout artifacts) */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-30 overflow-hidden">
+          <Image
+            src="/xtra.webp"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="hero-ustp-photo object-cover object-[50%_58%]"
+          />
+        </div>
+
+        {/* Layer 2: Muted slate-blue sky & building color grading + animated shades-of-blue sky shift */}
+        <div aria-hidden="true" className="hero-blue-light-cycle pointer-events-none absolute inset-0 -z-[25]" />
+
+        {/* Layer 3: White Three.js 3D volumetric cumulus clouds overlapping the upper skyline naturally */}
+        <HeroClouds3D />
+
+        {/* Layer 4: Subtle top/bottom vignette for crisp hero text legibility without darkening white clouds */}
+        <div aria-hidden="true" className="hero-text-scrim pointer-events-none absolute inset-0 -z-10" />
+
         <header className="mx-auto flex w-full max-w-[1368px] items-center justify-between px-5 py-5 sm:px-8">
-          <Link href="#home" aria-label="Tatak Swap home" className="flex h-[47px] w-28 items-center justify-center text-sm font-bold text-[#FFFFFF]">
+          <Link href="#home" aria-label="Tatak Swap home" className="flex h-[47px] w-28 items-center justify-center text-sm font-bold text-[#FFFFFF] drop-shadow-[0_2px_10px_rgba(8,18,44,0.65)]">
             Tatak.Swap
           </Link>
           <nav aria-label="Main navigation" className="hidden items-center gap-7 lg:flex">
             {siteLinks.map((item) => (
-              <a key={item.label} href={item.href} className="text-sm font-medium text-white transition hover:text-[#f4bb2d] xl:text-lg">
+              <a key={item.label} href={item.href} className="text-sm font-medium text-white drop-shadow-[0_2px_10px_rgba(8,18,44,0.65)] transition hover:text-[#f4bb2d] xl:text-lg">
                 {item.label}
               </a>
             ))}
-            <Link href="/auth" className="rounded-full border border-white px-5 py-2 text-sm font-medium transition hover:bg-white hover:text-[#04044a] xl:text-lg">
+            <Link href="/auth" className="rounded-full border border-white/85 bg-[#12264f]/40 px-5 py-2 text-sm font-medium transition hover:bg-white hover:text-[#04044a] xl:text-lg">
               LOG IN
             </Link>
           </nav>
           <details className="relative lg:hidden">
-            <summary className="cursor-pointer list-none rounded-full border border-white px-4 py-2 text-sm font-medium">MENU</summary>
+            <summary className="cursor-pointer list-none rounded-full border border-white/85 bg-[#12264f]/40 px-4 py-2 text-sm font-medium">MENU</summary>
             <nav aria-label="Mobile navigation" className="absolute right-0 top-12 z-20 grid min-w-44 gap-1 rounded-lg bg-white p-2 text-[#04044a] shadow-xl">
               {siteLinks.map((item) => (
                 <a key={item.label} href={item.href} className="rounded px-3 py-2 text-sm font-medium hover:bg-[#eef0f5]">
@@ -69,15 +83,12 @@ export default function LandingPage() {
         </header>
 
         <div className="mx-auto flex w-full max-w-[1368px] flex-1 flex-col items-center justify-start px-5 pt-8 pb-20 text-center sm:px-8">
-          <p className="mb-5 text-sm font-medium uppercase tracking-[0.22em] text-white/85">A marketplace built for USTP</p>
-          <h1 className="text-7xl font-bold leading-none sm:text-8xl xl:text-[150px]">WELCOME</h1>
-          <Link href="/marketplace" className="mt-2 rounded-full border border-white px-7 py-2.5 text-sm font-medium transition hover:bg-white hover:text-[#04044a] sm:text-lg">
+          <p className="mb-5 text-sm font-medium uppercase tracking-[0.22em] text-white/95 drop-shadow-[0_2px_12px_rgba(8,18,44,0.72)]">A marketplace built for USTP</p>
+          <h1 className="text-[2.85rem] font-bold leading-none drop-shadow-[0_8px_28px_rgba(8,18,44,0.6)] sm:text-7xl lg:text-8xl xl:text-[138px]">TATAK.SWAP</h1>
+          <Link href="/preview" className="mt-3 rounded-full border border-white/85 bg-[#12264f]/40 px-7 py-2.5 text-sm font-medium transition hover:bg-white hover:text-[#04044a] sm:text-lg">
             GET STARTED
           </Link>
         </div>
-        <a href="#about" className=" left-1/2 -translate-x-1/2 text-xs font-medium uppercase tracking-[0.18em] text-white/80">
-          Discover Tatak.Swap
-        </a>
       </section>
 
       <section id="about" className="scroll-mt-8 px-5 py-20 sm:px-8 sm:py-28">

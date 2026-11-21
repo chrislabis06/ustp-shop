@@ -3,31 +3,76 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ClipboardEvent } from 'react'
+import { ArrowLeft, Check, Eye, EyeOff, Mail } from 'lucide-react'
+import { useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getSupabaseConfig } from '@/lib/supabase/config'
 
-type Screen = 'login' | 'signup' | 'forgot' | 'verify' | 'password'
+type Screen = 'login' | 'signup' | 'sent' | 'forgot' | 'verify' | 'password'
 type VerifyPurpose = 'signup' | 'recovery'
 type VerifyChannel = 'email' | 'phone'
+type FieldKey = 'fullName' | 'identifier' | 'password' | 'confirmPassword' | 'terms'
+type FieldErrors = Partial<Record<FieldKey, string>>
 
 const passwordRules = [
-  { label: 'At least 8 characters', test: (value: string) => value.length >= 8 },
-  { label: 'One uppercase and one lowercase letter', test: (value: string) => /[A-Z]/.test(value) && /[a-z]/.test(value) },
-  { label: 'At least one number', test: (value: string) => /\d/.test(value) },
+  { label: 'At least 8 characters', short: '8+ characters', test: (value: string) => value.length >= 8 },
+  { label: 'One uppercase and one lowercase letter', short: 'Upper & lowercase', test: (value: string) => /[A-Z]/.test(value) && /[a-z]/.test(value) },
+  { label: 'At least one number', short: 'A number', test: (value: string) => /\d/.test(value) },
 ]
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/
+const EMAIL_PROBLEM = 'Enter a valid email address, like you@ustp.edu.ph.'
 
 const demoAuthActive = !getSupabaseConfig()
 
-export default function AuthExperience({ recovery = false }: { recovery?: boolean }) {
+const delay = (seconds: number) => ({ '--d': `${seconds}s` }) as CSSProperties
+
+function validateIdentifier(value: string, allowPhone: boolean) {
+  const trimmed = value.trim()
+  if (!trimmed) return allowPhone ? 'Enter your email or phone number.' : 'Enter your email address.'
+  if (trimmed.includes('@') || !allowPhone) return EMAIL_PATTERN.test(trimmed) ? '' : EMAIL_PROBLEM
+  return PHONE_PATTERN.test(trimmed.replace(/[\s-]/g, '')) ? '' : 'Enter a valid email, or a phone number with country code (for example +639171234567).'
+}
+
+function validateFullName(value: string) {
+  const trimmed = value.trim()
+  if (trimmed.length < 2) return 'Enter your full name (at least 2 characters).'
+  if (trimmed.length > 80) return 'Your name is too long. Please keep it under 80 characters.'
+  if (!Array.from(trimmed).some((character) => character.toLowerCase() !== character.toUpperCase())) return 'Your name should contain letters.'
+  return ''
+}
+
+function cleanIdentifier(value: string) {
+  const trimmed = value.trim()
+  return trimmed.includes('@') ? trimmed : trimmed.replace(/[\s-]/g, '')
+}
+
+function compact(errors: FieldErrors) {
+  return Object.fromEntries(Object.entries(errors).filter(([, message]) => message)) as FieldErrors
+}
+
+function friendlyError(error: unknown, fallback: string) {
+  const text = typeof error === 'object' && error !== null && 'message' in error ? String((error as { message: unknown }).message) : ''
+  if (!text) return fallback
+  if (/invalid login credentials/i.test(text)) return 'The email/phone or password you entered is incorrect.'
+  if (/email not confirmed/i.test(text)) return 'Your email isn’t confirmed yet. Open the confirmation link we sent you, then sign in.'
+  if (/already (been )?registered|already exists/i.test(text)) return 'An account with this email already exists. Try signing in, or reset your password.'
+  if (/rate limit|too many|security purposes/i.test(text)) return 'Too many attempts. Please wait a moment and try again.'
+  return text
+}
+
+function focusField(id: string) {
+  window.requestAnimationFrame(() => document.getElementById(id)?.focus())
+}
+
+export default function AuthExperience({ recovery = false, initialMode = 'login', nextPath = '' }: { recovery?: boolean; initialMode?: 'login' | 'signup'; nextPath?: string }) {
   const router = useRouter()
-  const [screen, setScreen] = useState<Screen>(recovery ? 'password' : 'login')
+  const [screen, setScreen] = useState<Screen>(recovery ? 'password' : initialMode)
   const [identifier, setIdentifier] = useState('')
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmation, setShowConfirmation] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [secondsLeft, setSecondsLeft] = useState(40)
@@ -36,16 +81,17 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [isError, setIsError] = useState(false)
+  const [errors, setErrors] = useState<FieldErrors>({})
   const codeInputs = useRef<Array<HTMLInputElement | null>>([])
 
   useEffect(() => {
-    if (screen !== 'verify' || secondsLeft <= 0) return
+    if ((screen !== 'verify' && screen !== 'sent') || secondsLeft <= 0) return
     const timer = window.setTimeout(() => setSecondsLeft((remaining) => remaining - 1), 1000)
     return () => window.clearTimeout(timer)
   }, [screen, secondsLeft])
 
   function postAuthPath() {
-    const next = new URLSearchParams(window.location.search).get('next')
+    const next = nextPath || new URLSearchParams(window.location.search).get('next')
     return next?.startsWith('/') && !next.startsWith('//') ? next : '/marketplace'
   }
 
@@ -58,10 +104,48 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
     setScreen(nextScreen)
     setMessage('')
     setIsError(false)
+    setErrors({})
+  }
+
+  function modeLink(target: 'login' | 'signup') {
+    return (event: MouseEvent<HTMLAnchorElement>) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+      event.preventDefault()
+      openScreen(target)
+    }
+  }
+
+  function modeHref(target: 'login' | 'signup') {
+    const params = new URLSearchParams()
+    if (target === 'signup') params.set('mode', 'signup')
+    if (nextPath) params.set('next', nextPath)
+    const query = params.toString()
+    return query ? `/auth?${query}` : '/auth'
+  }
+
+  function failValidation(found: FieldErrors, order: Array<[FieldKey, string]>) {
+    const visible = compact(found)
+    setErrors(visible)
+    announce('')
+    const first = order.find(([key]) => visible[key])
+    if (first) focusField(first[1])
+  }
+
+  function clearError(key: FieldKey) {
+    setErrors((current) => (current[key] ? { ...current, [key]: undefined } : current))
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const found: FieldErrors = {
+      identifier: validateIdentifier(identifier, true),
+      password: password ? '' : 'Enter your password.',
+    }
+    if (Object.values(found).some(Boolean)) {
+      failValidation(found, [['identifier', 'login-identifier'], ['password', 'login-password']])
+      return
+    }
+    setErrors({})
     setBusy(true)
     announce('')
     try {
@@ -72,13 +156,15 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
 
       const supabase = createClient()
       const credentials = { password }
-      const result = identifier.includes('@')
-        ? await supabase.auth.signInWithPassword({ ...credentials, email: identifier.trim() })
-        : await supabase.auth.signInWithPassword({ ...credentials, phone: identifier.trim() })
+      const cleaned = cleanIdentifier(identifier)
+      const result = cleaned.includes('@')
+        ? await supabase.auth.signInWithPassword({ ...credentials, email: cleaned })
+        : await supabase.auth.signInWithPassword({ ...credentials, phone: cleaned })
       if (result.error) throw result.error
       router.replace(postAuthPath())
+      router.refresh()
     } catch (error) {
-      announce(error instanceof Error ? error.message : 'We could not sign you in. Please try again.', true)
+      announce(friendlyError(error, 'We could not sign you in. Please try again.'), true)
     } finally {
       setBusy(false)
     }
@@ -86,14 +172,18 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
 
   async function handleSignup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!acceptedTerms) {
-      announce('Please accept the Terms of Service to create an account.', true)
+    const found: FieldErrors = {
+      fullName: validateFullName(fullName),
+      identifier: validateIdentifier(identifier, false),
+      password: passwordRules.every((rule) => rule.test(password)) ? '' : 'Use at least 8 characters with uppercase, lowercase, and a number.',
+      confirmPassword: !confirmPassword ? 'Re-enter your password to confirm it.' : confirmPassword !== password ? 'Your passwords do not match.' : '',
+      terms: acceptedTerms ? '' : 'Please accept the Terms of Service to create an account.',
+    }
+    if (Object.values(found).some(Boolean)) {
+      failValidation(found, [['fullName', 'signup-name'], ['identifier', 'signup-email'], ['password', 'signup-password'], ['confirmPassword', 'signup-confirm'], ['terms', 'signup-terms']])
       return
     }
-    if (!passwordRules.every((rule) => rule.test(password))) {
-      announce('Choose a password that meets all the requirements.', true)
-      return
-    }
+    setErrors({})
     setBusy(true)
     announce('')
     try {
@@ -108,17 +198,30 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
         password,
         options: {
           data: { full_name: fullName.trim() },
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/marketplace`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(postAuthPath())}`,
         },
       })
       if (error) throw error
       if (data.session) {
+        announce('Account created! Taking you in…')
         router.replace(postAuthPath())
+        router.refresh()
         return
       }
-      announce('Check your email for a confirmation link to finish creating your account.')
+      if (data.user?.identities?.length === 0) {
+        announce('An account with this email already exists. Try signing in, or reset your password.', true)
+        return
+      }
+      setPurpose('signup')
+      setChannel('email')
+      setSecondsLeft(40)
+      setPassword('')
+      setConfirmPassword('')
+      setMessage('')
+      setIsError(false)
+      setScreen('sent')
     } catch (error) {
-      announce(error instanceof Error ? error.message : 'We could not create your account. Please try again.', true)
+      announce(friendlyError(error, 'We could not create your account. Please try again.'), true)
     } finally {
       setBusy(false)
     }
@@ -126,9 +229,16 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
 
   async function handleForgot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const problem = validateIdentifier(identifier, true)
+    if (problem) {
+      failValidation({ identifier: problem }, [['identifier', 'recovery-identifier']])
+      return
+    }
+    setErrors({})
     setBusy(true)
     announce('')
-    const nextChannel: VerifyChannel = identifier.includes('@') ? 'email' : 'phone'
+    const cleaned = cleanIdentifier(identifier)
+    const nextChannel: VerifyChannel = cleaned.includes('@') ? 'email' : 'phone'
     try {
       if (demoAuthActive) {
         setPurpose('recovery')
@@ -142,8 +252,8 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
 
       const supabase = createClient()
       const result = nextChannel === 'email'
-        ? await supabase.auth.resetPasswordForEmail(identifier.trim(), { redirectTo: `${window.location.origin}/auth/callback?next=/auth?recovery=1` })
-        : await supabase.auth.signInWithOtp({ phone: identifier.trim(), options: { shouldCreateUser: false } })
+        ? await supabase.auth.resetPasswordForEmail(cleaned, { redirectTo: `${window.location.origin}/auth/callback?next=/auth?recovery=1` })
+        : await supabase.auth.signInWithOtp({ phone: cleaned, options: { shouldCreateUser: false } })
       if (result.error) throw result.error
       if (nextChannel === 'email') {
         announce('We sent a password reset link to your email.')
@@ -156,7 +266,7 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
       announce('We sent a verification code to your phone.')
       setScreen('verify')
     } catch (error) {
-      announce(error instanceof Error ? error.message : 'We could not send a code. Check your details and try again.', true)
+      announce(friendlyError(error, 'We could not send a code. Check your details and try again.'), true)
     } finally {
       setBusy(false)
     }
@@ -182,13 +292,14 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
       }
 
       const supabase = createClient()
+      const cleaned = cleanIdentifier(identifier)
       const result = channel === 'email'
         ? await supabase.auth.verifyOtp({
-            email: identifier.trim(),
+            email: cleaned,
             token,
             type: purpose === 'signup' ? 'signup' : 'recovery',
           })
-        : await supabase.auth.verifyOtp({ phone: identifier.trim(), token, type: 'sms' })
+        : await supabase.auth.verifyOtp({ phone: cleaned, token, type: 'sms' })
       if (result.error) throw result.error
       if (purpose === 'signup') {
         router.replace(postAuthPath())
@@ -196,7 +307,7 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
       }
       openScreen('password')
     } catch (error) {
-      announce(error instanceof Error ? error.message : 'That code could not be verified. Try again.', true)
+      announce(friendlyError(error, 'That code could not be verified. Try again.'), true)
     } finally {
       setBusy(false)
     }
@@ -216,18 +327,19 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
       }
 
       const supabase = createClient()
+      const cleaned = cleanIdentifier(identifier)
       const result = channel === 'email'
         ? purpose === 'signup'
-          ? await supabase.auth.resend({ type: 'signup', email: identifier.trim() })
-          : await supabase.auth.signInWithOtp({ email: identifier.trim(), options: { shouldCreateUser: false } })
-        : await supabase.auth.signInWithOtp({ phone: identifier.trim(), options: { shouldCreateUser: false } })
+          ? await supabase.auth.resend({ type: 'signup', email: cleaned, options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(postAuthPath())}` } })
+          : await supabase.auth.signInWithOtp({ email: cleaned, options: { shouldCreateUser: false } })
+        : await supabase.auth.signInWithOtp({ phone: cleaned, options: { shouldCreateUser: false } })
       if (result.error) throw result.error
       setCode(['', '', '', '', '', ''])
       setSecondsLeft(40)
-      announce('A new verification code is on its way.')
+      announce(screen === 'sent' ? 'We sent the confirmation email again.' : 'A new verification code is on its way.')
       codeInputs.current[0]?.focus()
     } catch (error) {
-      announce(error instanceof Error ? error.message : 'We could not resend your code. Please try again.', true)
+      announce(friendlyError(error, 'We could not resend. Please try again.'), true)
     } finally {
       setBusy(false)
     }
@@ -235,14 +347,15 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
 
   async function handleSetPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!passwordRules.every((rule) => rule.test(password))) {
-      announce('Choose a password that meets all the requirements.', true)
+    const found: FieldErrors = {
+      password: passwordRules.every((rule) => rule.test(password)) ? '' : 'Choose a password that meets all the requirements.',
+      confirmPassword: !confirmPassword ? 'Re-enter your password to confirm it.' : confirmPassword !== password ? 'Your passwords do not match.' : '',
+    }
+    if (Object.values(found).some(Boolean)) {
+      failValidation(found, [['password', 'new-password'], ['confirmPassword', 'confirm-password']])
       return
     }
-    if (password !== confirmPassword) {
-      announce('Your passwords do not match.', true)
-      return
-    }
+    setErrors({})
     setBusy(true)
     announce('')
     try {
@@ -256,7 +369,7 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
       if (error) throw error
       router.replace(postAuthPath())
     } catch (error) {
-      announce(error instanceof Error ? error.message : 'We could not update your password. Please try again.', true)
+      announce(friendlyError(error, 'We could not update your password. Please try again.'), true)
     } finally {
       setBusy(false)
     }
@@ -289,8 +402,9 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
 
   const isLoginOrSignup = screen === 'login' || screen === 'signup'
   const heading = {
-    login: 'Sign in',
+    login: 'Welcome Back!',
     signup: 'Create your account',
+    sent: 'Check your email',
     forgot: 'Reset your password',
     verify: purpose === 'signup' ? 'Verify your email' : 'Check your inbox',
     password: 'Set a new password',
@@ -298,183 +412,289 @@ export default function AuthExperience({ recovery = false }: { recovery?: boolea
   const supportingText = {
     login: 'Sign in to pick up where campus life left off.',
     signup: 'Join the USTP community and make room for good finds.',
+    sent: `We sent a confirmation link to ${identifier.trim()}.`,
     forgot: 'Enter the email or phone linked to your account.',
-    verify: `Enter the 6-digit code sent to ${identifier}.`,
+    verify: `Enter the 6-digit code sent to ${identifier.trim()}.`,
     password: 'Choose a strong password you have not used before.',
   }[screen]
 
   return (
-    <div className="relative isolate h-dvh overflow-hidden text-white">
-      <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
-        <Image src="/xxtra.webp" alt="" fill sizes="100vw" className="object-cover" />
+    <div className="auth-root">
+      <div className="auth-plate" aria-hidden="true">
+        <Image src="/xtra.webp" alt="" fill priority sizes="100vw" className="auth-plate-img" />
       </div>
-      <div className="mx-auto h-full max-w-[1440px] overflow-hidden">
-        <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[1fr_1fr]">
-          <aside className="relative flex h-[18dvh] min-h-[88px] flex-col overflow-hidden p-5 lg:h-full lg:min-h-0 lg:justify-between lg:p-8 xl:p-12">
-            <Link href="/" className="relative z-10 flex h-[47px] w-28 items-center justify-center px-2 text-sm font-bold text-[#FFFFFF]">Tatak.Swap</Link>
-            <div className="relative z-10 mt-auto hidden max-w-md rounded-r-lg border-l-4 border-[#f4bb2d] bg-white/90 py-4 pr-5 pl-5 text-[#04044a] shadow-lg backdrop-blur-sm lg:block">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em]">USTP Community</p>
-              <p className="mt-4 text-3xl font-semibold leading-tight">Useful things find a new home here.</p>
-            </div>
-          </aside>
+      <div className="auth-fx" aria-hidden="true">
+        <span className="auth-orb auth-orb-a" />
+        <span className="auth-orb auth-orb-b" />
+        <span className="auth-orb auth-orb-c" />
+      </div>
+      <div className="auth-shade" aria-hidden="true" />
 
-          <section className="relative z-20 flex min-h-0 overflow-y-auto px-5 py-4 text-white pointer-events-auto sm:px-8 sm:py-6 lg:h-full lg:px-12 lg:py-10">
-            <div className="relative z-20 mx-auto flex max-w-[510px] items-center justify-center min-h-full pointer-events-auto lg:translate-x-0 xl:translate-x-8" style={{ zoom: 0.85 }}>
-              <div className="w-full py-5 sm:py-8">
-                <div className="mb-8 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f4bb2d]">Tatak.Swap account</p>
-                    <h2 className="mt-2 text-[28px] font-semibold text-white">{heading}</h2>
-                  </div>
-                  <Link href="/marketplace" className="text-[11px] font-semibold text-white/75 transition hover:text-white">Back to marketplace</Link>
+      <div className="auth-layout">
+        <section className="auth-hero">
+          <header className="auth-topbar">
+            <Link href="/" className="auth-logo a-in" style={delay(0)}>
+              <span className="auth-logo-tile" aria-hidden="true">T</span>
+              <span>Tatak.Swap</span>
+            </Link>
+            <Link href="/" className="auth-back a-in" style={delay(0.08)}>
+              <ArrowLeft size={15} strokeWidth={2} aria-hidden="true" />
+              <span>Back to Home</span>
+            </Link>
+          </header>
+
+          <div className="auth-pitch">
+            <h1 className="auth-headline">
+              {['Useful things find', 'a new home here.'].map((line, index) => (
+                <span key={line} className="auth-line"><span className="auth-line-in" style={delay(0.35 + index * 0.12)}>{line}</span></span>
+              ))}
+            </h1>
+            <p className="auth-subline a-in" style={delay(0.7)}>Buy, sell and swap everyday finds with fellow USTP students, safely and close to campus.</p>
+          </div>
+        </section>
+
+        <section className="auth-card a-card">
+          <div className="auth-form">
+            <h2 className="auth-heading a-in" style={delay(0.5)}>{heading}</h2>
+            <p className="auth-support a-in" style={delay(0.58)}>{supportingText}</p>
+
+            {isLoginOrSignup && (
+              <nav className="auth-tabs a-in" style={delay(0.64)} aria-label="Account access">
+                <Link href={modeHref('login')} prefetch={false} onClick={modeLink('login')} aria-current={screen === 'login' ? 'page' : undefined} className="auth-tab">Sign in</Link>
+                <Link href={modeHref('signup')} prefetch={false} onClick={modeLink('signup')} aria-current={screen === 'signup' ? 'page' : undefined} className="auth-tab">Create account</Link>
+              </nav>
+            )}
+
+            {screen === 'login' && (
+              <form onSubmit={handleLogin} noValidate className="auth-stack">
+                <Field id="login-identifier" label="Email / Phone number" error={errors.identifier} delay={0.7}>
+                  <input id="login-identifier" type="text" inputMode="email" autoComplete="username" value={identifier} onChange={(event) => { setIdentifier(event.target.value); clearError('identifier') }} placeholder="you@ustp.edu.ph or +63" className="auth-field" {...aria('login-identifier', errors.identifier)} />
+                </Field>
+                <Field id="login-password" label="Password" error={errors.password} delay={0.78}>
+                  <PasswordInput id="login-password" autoComplete="current-password" value={password} onChange={(value) => { setPassword(value); clearError('password') }} placeholder="Enter your password" error={errors.password} />
+                </Field>
+                <div className="auth-row a-in" style={delay(0.86)}>
+                  <button type="button" onClick={() => openScreen('forgot')} className="auth-link">Forgot password?</button>
                 </div>
+                <SubmitButton busy={busy} delaySeconds={0.94}>{busy ? 'Signing in…' : 'Login'}</SubmitButton>
+              </form>
+            )}
 
-                {isLoginOrSignup && (
-                  <div className="relative z-20 mb-8 grid grid-cols-2 border-b border-white/25 pointer-events-auto" role="tablist" aria-label="Account access">
-                    <button type="button" role="tab" aria-selected={screen === 'login'} onClick={() => openScreen('login')} className={`relative z-20 pointer-events-auto border-b-2 px-4 py-3 text-sm font-semibold transition ${screen === 'login' ? 'border-[#f4bb2d] text-white' : 'border-transparent text-white/60 hover:text-white'}`}>Sign in</button>
-                    <button type="button" role="tab" aria-selected={screen === 'signup'} onClick={() => openScreen('signup')} className={`relative z-20 pointer-events-auto border-b-2 px-4 py-3 text-sm font-semibold transition ${screen === 'signup' ? 'border-[#f4bb2d] text-white' : 'border-transparent text-white/60 hover:text-white'}`}>Create account</button>
-                  </div>
-                )}
+            {screen === 'signup' && (
+              <form onSubmit={handleSignup} noValidate className="auth-stack auth-stack-tight">
+                <Field id="signup-name" label="Full name" error={errors.fullName} delay={0.7}>
+                  <input id="signup-name" type="text" autoComplete="name" maxLength={80} value={fullName} onChange={(event) => { setFullName(event.target.value); clearError('fullName') }} placeholder="Your name" className="auth-field" {...aria('signup-name', errors.fullName)} />
+                </Field>
+                <Field id="signup-email" label="USTP email" error={errors.identifier} delay={0.76}>
+                  <input id="signup-email" type="email" autoComplete="email" value={identifier} onChange={(event) => { setIdentifier(event.target.value); clearError('identifier') }} placeholder="you@ustp.edu.ph" className="auth-field" {...aria('signup-email', errors.identifier)} />
+                </Field>
+                <Field id="signup-password" label="Password" error={errors.password} delay={0.82}>
+                  <PasswordInput id="signup-password" autoComplete="new-password" value={password} onChange={(value) => { setPassword(value); clearError('password') }} placeholder="Create a password" error={errors.password} />
+                  {!errors.password && <p className="auth-hint">Use at least 8 characters with uppercase, lowercase, and a number.</p>}
+                </Field>
+                <Field id="signup-confirm" label="Confirm password" error={errors.confirmPassword} delay={0.88}>
+                  <PasswordInput id="signup-confirm" autoComplete="new-password" value={confirmPassword} onChange={(value) => { setConfirmPassword(value); clearError('confirmPassword') }} placeholder="Enter it again" error={errors.confirmPassword} />
+                </Field>
+                <div className="a-in" style={delay(0.92)}>
+                  <label className="auth-check">
+                    <input id="signup-terms" type="checkbox" checked={acceptedTerms} onChange={(event) => { setAcceptedTerms(event.target.checked); clearError('terms') }} {...aria('signup-terms', errors.terms)} />
+                    <span className="auth-check-box" aria-hidden="true">
+                      <Check size={12} strokeWidth={3} aria-hidden="true" />
+                    </span>
+                    <span>I agree to the Terms of Service and Privacy Policy.</span>
+                  </label>
+                  {errors.terms && <p id="signup-terms-error" className="auth-error" role="alert">{errors.terms}</p>}
+                </div>
+                <SubmitButton busy={busy} delaySeconds={0.96}>{busy ? 'Creating account…' : 'Create account'}</SubmitButton>
+                <p className="auth-foot a-in" style={delay(1)}>Already have an account? <Link href={modeHref('login')} prefetch={false} onClick={modeLink('login')} className="auth-link">Sign in</Link></p>
+              </form>
+            )}
 
-                <p className="mb-6 text-sm leading-6 text-white/75">{supportingText}</p>
-
-                {screen === 'login' && (
-                  <form onSubmit={handleLogin} className="space-y-5">
-                    <div>
-                      <label htmlFor="login-identifier" className="mb-2 block text-sm font-semibold text-white">Email / Phone number</label>
-                      <input id="login-identifier" type="text" autoComplete="username" required value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="you@ustp.edu.ph or +63" className="auth-field" />
-                    </div>
-                    <div>
-                      <label htmlFor="login-password" className="mb-2 block text-sm font-semibold text-white">Password</label>
-                      <div className="relative">
-                        <input id="login-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" className="auth-field pr-20" />
-                        <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute inset-y-0 right-3 text-xs font-semibold text-white/70 hover:text-white" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? 'Hide' : 'Show'}</button>
-                      </div>
-                    </div>
-                    <div className="-mt-1 flex justify-end">
-                      <button type="button" onClick={() => openScreen('forgot')} className="text-xs font-semibold text-white underline decoration-[#f4bb2d] decoration-2 underline-offset-4 hover:text-[#f4bb2d]">Forgot password?</button>
-                    </div>
-                    <SubmitButton busy={busy}>{busy ? 'Signing in…' : 'Sign in'}</SubmitButton>
-                  </form>
-                )}
-
-                {screen === 'signup' && (
-                  <form onSubmit={handleSignup} className="relative z-20 space-y-4 pointer-events-auto">
-                    <div>
-                      <label htmlFor="signup-name" className="mb-2 block text-sm font-semibold text-white">Full name</label>
-                      <input id="signup-name" type="text" autoComplete="name" required minLength={2} value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your name" className="auth-field" />
-                    </div>
-                    <div>
-                      <label htmlFor="signup-email" className="mb-2 block text-sm font-semibold text-white">USTP email</label>
-                      <input id="signup-email" type="email" autoComplete="email" required value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="you@ustp.edu.ph" className="auth-field" />
-                    </div>
-                    <div>
-                      <label htmlFor="signup-password" className="mb-2 block text-sm font-semibold text-white">Password</label>
-                      <div className="relative">
-                        <input id="signup-password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Create a password" className="auth-field pr-20" />
-                        <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute inset-y-0 right-3 text-xs font-semibold text-white/70 hover:text-white" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? 'Hide' : 'Show'}</button>
-                      </div>
-                      <p className="mt-2 text-[11px] leading-5 text-white/65">Use 8+ characters, upper and lowercase letters, and a number.</p>
-                    </div>
-                    <label className="flex cursor-pointer items-start gap-2.5 pt-1 text-xs leading-5 text-white/75">
-                      <input type="checkbox" checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[#f4bb2d]" />
-                      <span>I agree to the Terms of Service and Privacy Policy.</span>
-                    </label>
-                    <SubmitButton busy={busy}>{busy ? 'Creating account…' : 'Create account'}</SubmitButton>
-                    <p className="pt-1 text-center text-xs text-white/70">Already have an account? <button type="button" onClick={() => openScreen('login')} className="font-semibold text-white underline decoration-[#f4bb2d] underline-offset-4">Sign in</button></p>
-                  </form>
-                )}
-
-                {screen === 'forgot' && (
-                  <form onSubmit={handleForgot} className="space-y-5">
-                    <div>
-                      <label htmlFor="recovery-identifier" className="mb-2 block text-sm font-semibold text-white">Email / Phone number</label>
-                      <input id="recovery-identifier" type="text" autoComplete="username" required value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="you@ustp.edu.ph or +63" className="auth-field" />
-                    </div>
-                    <SubmitButton busy={busy}>{busy ? 'Sending code…' : 'Send verification code'}</SubmitButton>
-                    <button type="button" onClick={() => openScreen('login')} className="w-full text-center text-xs font-semibold text-white hover:underline">← Back to sign in</button>
-                  </form>
-                )}
-
-                {screen === 'verify' && (
-                  <form onSubmit={handleVerify} className="space-y-6">
-                    <div>
-                      <label className="mb-3 block text-sm font-semibold text-white" htmlFor="verification-code-0">Verification code</label>
-                      <div className="flex justify-between gap-2 sm:gap-3" aria-label="6-digit verification code">
-                        {code.map((digit, index) => (
-                          <input
-                            key={index}
-                            ref={(element) => { codeInputs.current[index] = element }}
-                            id={`verification-code-${index}`}
-                            type="text"
-                            inputMode="numeric"
-                            autoComplete={index === 0 ? 'one-time-code' : 'off'}
-                            aria-label={`Verification code digit ${index + 1}`}
-                            maxLength={index === 0 ? 6 : 1}
-                            required
-                            value={digit}
-                            onChange={(event) => updateCode(index, event.target.value)}
-                            onKeyDown={(event) => handleCodeKeyDown(event, index)}
-                            onPaste={(event) => handleCodePaste(event, index)}
-                            className="h-12 min-w-0 flex-1 rounded-xl border-2 border-white/65 bg-transparent text-center text-lg font-semibold text-white outline-none transition focus:border-[#f4bb2d] focus:ring-4 focus:ring-[#f4bb2d]/15 sm:h-14"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <SubmitButton busy={busy}>{busy ? 'Verifying…' : 'Verify code'}</SubmitButton>
-                    <p className="text-center text-xs text-white/70">
-                      {secondsLeft > 0 ? `Resend after ${secondsLeft} seconds` : 'Didn’t receive a code?'}{' '}
-                      <button type="button" disabled={secondsLeft > 0 || busy} onClick={handleResend} className="font-semibold text-[#0d1d3b] underline decoration-[#f4bb2d] underline-offset-4 disabled:cursor-not-allowed disabled:text-[#a4adba] disabled:no-underline">Resend code</button>
-                    </p>
-                    <button type="button" onClick={() => openScreen(purpose === 'signup' ? 'signup' : 'forgot')} className="w-full text-center text-xs font-semibold text-white hover:underline">← Back</button>
-                  </form>
-                )}
-
-                {screen === 'password' && (
-                  <form onSubmit={handleSetPassword} className="space-y-5">
-                    <div>
-                      <p className="mb-3 text-sm font-semibold text-white">Your password should have:</p>
-                      <ul className="space-y-2">
-                        {passwordRules.map((rule) => {
-                          const met = rule.test(password)
-                          return <li key={rule.label} className={`flex items-center gap-2 text-xs ${met ? 'text-[#86d6ad]' : 'text-white/60'}`}><span aria-hidden="true" className="grid h-4 w-4 place-items-center rounded-full border text-[10px]">{met ? '✓' : ''}</span>{rule.label}</li>
-                        })}
-                      </ul>
-                    </div>
-                    <div>
-                      <label htmlFor="new-password" className="mb-2 block text-sm font-semibold text-white">New password</label>
-                      <div className="relative">
-                        <input id="new-password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Create a new password" className="auth-field pr-20" />
-                        <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute inset-y-0 right-3 text-xs font-semibold text-white/70 hover:text-white" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? 'Hide' : 'Show'}</button>
-                      </div>
-                    </div>
-                    <div>
-                      <label htmlFor="confirm-password" className="mb-2 block text-sm font-semibold text-white">Confirm new password</label>
-                      <div className="relative">
-                        <input id="confirm-password" type={showConfirmation ? 'text' : 'password'} autoComplete="new-password" required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Enter it again" className="auth-field pr-20" />
-                        <button type="button" onClick={() => setShowConfirmation((visible) => !visible)} className="absolute inset-y-0 right-3 text-xs font-semibold text-white/70 hover:text-white" aria-label={showConfirmation ? 'Hide confirmation' : 'Show confirmation'}>{showConfirmation ? 'Hide' : 'Show'}</button>
-                      </div>
-                    </div>
-                    <SubmitButton busy={busy}>{busy ? 'Updating password…' : 'Set new password'}</SubmitButton>
-                  </form>
-                )}
-
-                {demoAuthActive && (
-                  <p className="mt-4 rounded-xl border border-[#f4bb2d]/30 bg-[#fff7d6] px-3.5 py-3 text-[11px] leading-5 text-[#7a5400]">
-                    Demo mode is active. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment to enable real authentication.
-                  </p>
-                )}
-
-                {message && <p role="status" aria-live="polite" className={`mt-5 rounded-xl px-3.5 py-3 text-xs leading-5 ${isError ? 'bg-[#fff1ef] text-[#a33d31]' : 'bg-[#eef7f2] text-[#236648]'}`}>{message}</p>}
+            {screen === 'sent' && (
+              <div className="auth-stack">
+                <div className="auth-sent a-in" style={delay(0.66)}>
+                  <span className="auth-sent-icon" aria-hidden="true">
+                    <Mail size={22} strokeWidth={1.8} aria-hidden="true" />
+                  </span>
+                  <p>Open the link in that email to activate your account, then come back and sign in. It can take a minute to arrive, so check your spam folder too.</p>
+                </div>
+                <button type="button" onClick={() => openScreen('login')} className="auth-submit a-in" style={delay(0.74)}>Back to sign in</button>
+                <p className="auth-foot a-in" style={delay(0.82)}>
+                  {secondsLeft > 0 ? `Resend available in ${secondsLeft}s` : 'Didn’t get the email?'}{' '}
+                  <button type="button" disabled={secondsLeft > 0 || busy} onClick={handleResend} className="auth-link">Resend email</button>
+                </p>
+                <button type="button" onClick={() => openScreen('signup')} className="auth-link auth-center a-in" style={delay(0.9)}>Use a different email</button>
               </div>
-            </div>
-          </section>
-        </div>
+            )}
+
+            {screen === 'forgot' && (
+              <form onSubmit={handleForgot} noValidate className="auth-stack">
+                <Field id="recovery-identifier" label="Email / Phone number" error={errors.identifier} delay={0.7}>
+                  <input id="recovery-identifier" type="text" inputMode="email" autoComplete="username" value={identifier} onChange={(event) => { setIdentifier(event.target.value); clearError('identifier') }} placeholder="you@ustp.edu.ph or +63" className="auth-field" {...aria('recovery-identifier', errors.identifier)} />
+                </Field>
+                <SubmitButton busy={busy} delaySeconds={0.78}>{busy ? 'Sending code…' : 'Send verification code'}</SubmitButton>
+                <button type="button" onClick={() => openScreen('login')} className="auth-link auth-center a-in" style={delay(0.86)}>Back to sign in</button>
+              </form>
+            )}
+
+            {screen === 'verify' && (
+              <form onSubmit={handleVerify} noValidate className="auth-stack">
+                <div className="a-in" style={delay(0.7)}>
+                  <label className="auth-label" htmlFor="verification-code-0">Verification code</label>
+                  <div className="auth-code" role="group" aria-label="6-digit verification code">
+                    {code.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={(element) => { codeInputs.current[index] = element }}
+                        id={`verification-code-${index}`}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                        aria-label={`Verification code digit ${index + 1}`}
+                        maxLength={index === 0 ? 6 : 1}
+                        value={digit}
+                        onChange={(event) => updateCode(index, event.target.value)}
+                        onKeyDown={(event) => handleCodeKeyDown(event, index)}
+                        onPaste={(event) => handleCodePaste(event, index)}
+                        className="auth-field auth-code-digit"
+                      />
+                    ))}
+                  </div>
+                </div>
+                <SubmitButton busy={busy} delaySeconds={0.78}>{busy ? 'Verifying…' : 'Verify code'}</SubmitButton>
+                <p className="auth-foot a-in" style={delay(0.86)}>
+                  {secondsLeft > 0 ? `Resend after ${secondsLeft} seconds` : 'Didn’t receive a code?'}{' '}
+                  <button type="button" disabled={secondsLeft > 0 || busy} onClick={handleResend} className="auth-link">Resend code</button>
+                </p>
+                <button type="button" onClick={() => openScreen(purpose === 'signup' ? 'signup' : 'forgot')} className="auth-link auth-center a-in" style={delay(0.92)}>Back</button>
+              </form>
+            )}
+
+            {screen === 'password' && (
+              <form onSubmit={handleSetPassword} noValidate className="auth-stack">
+                <div className="a-in" style={delay(0.7)}>
+                  <p className="auth-label">Your password should have:</p>
+                  <PasswordRules password={password} />
+                </div>
+                <Field id="new-password" label="New password" error={errors.password} delay={0.76}>
+                  <PasswordInput id="new-password" autoComplete="new-password" value={password} onChange={(value) => { setPassword(value); clearError('password') }} placeholder="Create a new password" error={errors.password} />
+                </Field>
+                <Field id="confirm-password" label="Confirm new password" error={errors.confirmPassword} delay={0.82}>
+                  <PasswordInput id="confirm-password" autoComplete="new-password" value={confirmPassword} onChange={(value) => { setConfirmPassword(value); clearError('confirmPassword') }} placeholder="Enter it again" error={errors.confirmPassword} />
+                </Field>
+                <SubmitButton busy={busy} delaySeconds={0.9}>{busy ? 'Updating password…' : 'Set new password'}</SubmitButton>
+              </form>
+            )}
+
+            {demoAuthActive && (
+              <p className="auth-notice auth-notice-demo">
+                Demo mode is active. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY) in your environment to enable real authentication.
+              </p>
+            )}
+
+            {message && <p role="status" aria-live="polite" className={`auth-notice ${isError ? 'auth-notice-error' : 'auth-notice-ok'}`}>{message}</p>}
+          </div>
+        </section>
       </div>
     </div>
   )
 }
 
-function SubmitButton({ children, busy }: { children: React.ReactNode; busy: boolean }) {
-  return <button type="submit" disabled={busy} className="relative z-20 flex min-h-12 w-full items-center justify-center rounded-[20px] bg-white px-5 py-3 text-sm font-semibold text-[#04044a] pointer-events-auto transition hover:bg-[#f4bb2d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f4bb2d] disabled:cursor-wait disabled:opacity-70">{children}</button>
+function aria(id: string, error?: string) {
+  return { 'aria-invalid': error ? true : undefined, 'aria-describedby': error ? `${id}-error` : undefined } as const
+}
+
+function Field({ id, label, error, delay: delaySeconds, children }: { id: string; label: string; error?: string; delay: number; children: ReactNode }) {
+  return (
+    <div className="a-in" style={delay(delaySeconds)}>
+      <label htmlFor={id} className="auth-label">{label}</label>
+      {children}
+      {error && <p id={`${id}-error`} className="auth-error" role="alert">{error}</p>}
+    </div>
+  )
+}
+
+function PasswordRules({ password }: { password: string }) {
+  return (
+    <ul className="auth-rules" aria-label="Password requirements">
+      {passwordRules.map((rule) => {
+        const met = rule.test(password)
+        return (
+          <li key={rule.label} className={met ? 'is-met' : ''}>
+            <span aria-hidden="true">{met ? <Check size={10} strokeWidth={3} /> : null}</span>
+            {rule.label}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function PasswordInput({ id, autoComplete, value, onChange, placeholder, error }: {
+  id: string
+  autoComplete: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+  error?: string
+}) {
+  const [visible, setVisible] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const label = visible ? 'Hide password' : 'Show password'
+
+  function handleToggle(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const input = inputRef.current
+    const selectionStart = input?.selectionStart ?? null
+    const selectionEnd = input?.selectionEnd ?? null
+    const wasFocused = typeof document !== 'undefined' && document.activeElement === input
+
+    setVisible((current) => !current)
+
+    if (wasFocused && input && selectionStart !== null && selectionEnd !== null) {
+      window.requestAnimationFrame(() => {
+        if (document.activeElement === input) {
+          try {
+            input.setSelectionRange(selectionStart, selectionEnd)
+          } catch {
+            // Ignore selection restoration errors on unsupported input states
+          }
+        }
+      })
+    }
+  }
+
+  return (
+    <div className="auth-pw">
+      <input
+        ref={inputRef}
+        id={id}
+        type={visible ? 'text' : 'password'}
+        autoComplete={autoComplete}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="auth-field auth-field-pw"
+        {...aria(id, error)}
+      />
+      <button
+        type="button"
+        className="auth-eye"
+        aria-label={label}
+        aria-controls={id}
+        aria-pressed={visible}
+        title={label}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={handleToggle}
+      >
+        {visible ? <Eye size={18} strokeWidth={2} aria-hidden="true" /> : <EyeOff size={18} strokeWidth={2} aria-hidden="true" />}
+      </button>
+    </div>
+  )
+}
+
+function SubmitButton({ children, busy, delaySeconds }: { children: ReactNode; busy: boolean; delaySeconds: number }) {
+  return <button type="submit" disabled={busy} className="auth-submit a-in" style={delay(delaySeconds)}>{children}</button>
 }

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { startConversation } from '@/app/actions'
 import { formatPrice } from '@/lib/mock-data'
 import { getMarketplaceListing, hasSupabaseConfiguration } from '@/lib/marketplace-data'
@@ -7,14 +7,16 @@ import { createClient } from '@/lib/supabase/server'
 
 export default async function ListingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  if (!hasSupabaseConfiguration()) redirect(`/auth?next=${encodeURIComponent(`/listings/${id}`)}`)
+
+  const supabase = await createClient()
+  const { data: { user: currentUser } } = await supabase.auth.getUser()
+  if (!currentUser) redirect(`/auth?next=${encodeURIComponent(`/listings/${id}`)}`)
+
   const listing = await getMarketplaceListing(id)
   if (!listing) notFound()
 
-  const user = hasSupabaseConfiguration()
-    ? (await createClient()).auth.getUser().then(({ data }) => data.user)
-    : Promise.resolve(null)
-  const currentUser = await user
-  const isOwner = currentUser?.id === listing.sellerId
+  const isOwner = currentUser.id === listing.sellerId
 
   return (
     <main className="min-h-screen bg-[#f4f6f9] px-5 py-6 sm:px-8">

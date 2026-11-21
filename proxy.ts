@@ -4,7 +4,12 @@ import { getSupabaseConfig } from '@/lib/supabase/config'
 
 export async function proxy(request: NextRequest) {
   const config = getSupabaseConfig()
-  if (!config) return NextResponse.next({ request })
+  if (!config) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth'
+    url.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`)
+    return NextResponse.redirect(url)
+  }
 
   let response = NextResponse.next({ request })
   const supabase = createServerClient(config.supabaseUrl, config.supabaseKey, {
@@ -32,5 +37,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/account/:path*', '/admin/:path*', '/listings/new', '/messages/:path*'],
+  matcher: ['/marketplace/:path*', '/listings/:path*', '/account/:path*', '/admin/:path*', '/messages/:path*'],
 }
