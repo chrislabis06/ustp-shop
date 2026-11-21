@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import {
@@ -16,13 +17,18 @@ import {
   Tag,
   X,
 } from 'lucide-react'
-import { Poppins } from 'next/font/google'
+import { Poppins, Syne } from 'next/font/google'
 import { categories, formatPrice } from '@/lib/mock-data'
 import type { MarketplaceListing } from '@/lib/marketplace-data'
 
 const poppins = Poppins({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
+})
+
+const syne = Syne({
+  subsets: ['latin'],
+  weight: ['700', '800'],
 })
 
 function CategoryIcon({ category }: { category: string }) {
@@ -90,10 +96,17 @@ export default function MarketplacePreview({
             </Link>
             <span className="h-4 w-px bg-[#d9e0ea]" aria-hidden="true" />
             <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#16284c] text-xs font-bold text-[#ffb547]">
-                TS
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#16284c] p-1.5">
+                <Image
+                  src="/ts-monogram.png"
+                  alt=""
+                  width={20}
+                  height={21}
+                  referrerPolicy="no-referrer"
+                  className="h-full w-auto object-contain"
+                />
               </span>
-              <span className="text-base font-bold tracking-tight text-[#16284c]">
+              <span className={`${syne.className} text-base font-extrabold tracking-[-0.03em] text-[#16284c]`}>
                 Tatak.Swap
               </span>
               <span className="hidden rounded-full bg-[#efe8da] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[#16284c] sm:inline-block">

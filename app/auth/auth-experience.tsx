@@ -2,11 +2,17 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import { Syne } from 'next/font/google'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Check, Eye, EyeOff, Mail } from 'lucide-react'
 import { useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getSupabaseConfig } from '@/lib/supabase/config'
+
+const syne = Syne({
+  subsets: ['latin'],
+  weight: ['700', '800'],
+})
 
 type Screen = 'login' | 'signup' | 'sent' | 'forgot' | 'verify' | 'password'
 type VerifyPurpose = 'signup' | 'recovery'
@@ -434,8 +440,16 @@ export default function AuthExperience({ recovery = false, initialMode = 'login'
         <section className="auth-hero">
           <header className="auth-topbar">
             <Link href="/" className="auth-logo a-in" style={delay(0)}>
-              <span className="auth-logo-tile" aria-hidden="true">T</span>
-              <span>Tatak.Swap</span>
+              <Image
+                src="/ts-monogram.png"
+                alt=""
+                width={28}
+                height={29}
+                priority
+                referrerPolicy="no-referrer"
+                className="h-6 w-auto object-contain drop-shadow-[0_2px_10px_rgba(8,18,44,0.45)] sm:h-7"
+              />
+              <span className={`${syne.className} font-extrabold tracking-[-0.03em]`}>Tatak.Swap</span>
             </Link>
             <Link href="/" className="auth-back a-in" style={delay(0.08)}>
               <ArrowLeft size={15} strokeWidth={2} aria-hidden="true" />

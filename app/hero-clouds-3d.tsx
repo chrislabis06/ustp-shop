@@ -295,7 +295,7 @@ export default function HeroClouds3D() {
     let disposed = false
     let rafId = 0
     let timerId = 0
-    const clock = new THREE.Clock()
+    let lastTime = performance.now()
 
     const afterDraw = (fn: () => void) => {
       rafId = window.requestAnimationFrame(() => {
@@ -305,7 +305,9 @@ export default function HeroClouds3D() {
 
     const tick = () => {
       if (disposed) return
-      const dt = Math.min(clock.getDelta(), 0.1)
+      const now = performance.now()
+      const dt = Math.min(Math.max((now - lastTime) / 1000, 0), 0.1)
+      lastTime = now
       uniforms.uTime.value += dt
       renderer.render(scene, camera)
 

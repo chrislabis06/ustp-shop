@@ -1,12 +1,19 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
+import { Syne } from 'next/font/google'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { categories, formatPrice } from '@/lib/mock-data'
 import type { MarketplaceListing } from '@/lib/marketplace-data'
 import { createClient } from '@/lib/supabase/client'
 import { getSupabaseConfig } from '@/lib/supabase/config'
+
+const syne = Syne({
+  subsets: ['latin'],
+  weight: ['700', '800'],
+})
 
 export default function Marketplace({
   initialListings,
@@ -61,9 +68,18 @@ export default function Marketplace({
   return (
     <main className="min-h-screen overflow-hidden bg-[#f4f6f9]">
       <nav className="mx-auto flex max-w-[1320px] items-center justify-between px-5 py-5 sm:px-8">
-        <Link href="/marketplace" className="flex items-center gap-3 text-[#002855]">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-[#fdb813] text-sm font-black text-[#002855]">TS</span>
-          <span className="text-xl font-black tracking-[-0.06em]">Tatak<span className="text-[#fdb813]">.</span>Swap</span>
+        <Link href="/marketplace" className="flex items-center gap-2.5 text-[#16284c]">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#16284c] p-1.5">
+            <Image
+              src="/ts-monogram.png"
+              alt=""
+              width={20}
+              height={21}
+              referrerPolicy="no-referrer"
+              className="h-full w-auto object-contain"
+            />
+          </span>
+          <span className={`${syne.className} text-lg font-extrabold tracking-[-0.03em]`}>Tatak.Swap</span>
         </Link>
         <div className="hidden items-center gap-8 text-sm font-semibold text-[#556070] md:flex">
           <a href="#browse" className="text-[#0f172a]">Browse</a>
